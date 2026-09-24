@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { env } from "./config/env.js";
 
 
@@ -23,6 +24,14 @@ const app = express();
 
 app.use(express.json());
 app.use(requestLogger);
+
+app.use(
+  cors({
+    origin: env.frontendUrl,
+    credentials: true
+  })
+);
+
 
 // =========================
 // Routes

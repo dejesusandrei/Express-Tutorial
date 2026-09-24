@@ -12,7 +12,11 @@ const envSchema = z.object({
 
   JWT_SECRET: z
     .string()
-    .min(32, "JWT_SECRET must be at least 32 characters")
+    .min(32, "JWT_SECRET must be at least 32 characters"),
+
+  FRONTEND_URL: z
+  .string()
+  .url("FRONTEND_URL must be a valid URL"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -29,5 +33,6 @@ if (!parsedEnv.success) {
 export const env = {
   port: parsedEnv.data.PORT,
   nodeEnv: parsedEnv.data.NODE_ENV,
-  jwtSecret: parsedEnv.data.JWT_SECRET
+  jwtSecret: parsedEnv.data.JWT_SECRET,
+  frontendUrl: parsedEnv.data.FRONTEND_URL,
 };
