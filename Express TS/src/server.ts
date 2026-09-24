@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import { env } from "./config/env.js";
 
 
@@ -21,16 +22,15 @@ const app = express();
 // =========================
 // Global Middleware
 // =========================
-
-app.use(express.json());
-app.use(requestLogger);
-
+app.use(helmet());
 app.use(
   cors({
     origin: env.frontendUrl,
     credentials: true
   })
 );
+app.use(express.json());
+app.use(requestLogger);
 
 
 // =========================
