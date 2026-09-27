@@ -46,11 +46,11 @@ export const getUserById = async (
 // POST
 export const createUser = async (
   req: Request,
-  res: Response<ApiResult<{ user: Omit<User, "passwordHash">}>>
+  res: Response<ApiResult<{ user: Omit<User, "password_hash">}>>
 ) => {
   const user = await userService.createUser(req.body);
 
-  const { passwordHash, ...safeUser } = user;
+  const { password_hash, ...safeUser } = user;
 
   res.status(201).json({
     success: true,
@@ -64,7 +64,7 @@ export const createUser = async (
 // DELETE
 export const deleteUser = async (
   req: Request,
-  res: Response<ApiResult<{ user: Omit<User, "passwordHash">}>>
+  res: Response<ApiResult<{ user: Omit<User, "password_hash">}>>
 ) => {
   const { id } = req.params;
 
@@ -74,7 +74,7 @@ export const deleteUser = async (
 
   const user = await userService.deleteUser(id);
 
-  const { passwordHash, ...safeUser } = user;
+  const { password_hash, ...safeUser } = user;
 
   res.status(200).json({
     success: true,
@@ -87,7 +87,7 @@ export const deleteUser = async (
 
 export const getCurrentUser = async (
   req: Request,
-  res: Response<ApiResult<{ user: Omit<User, "passwordHash"> }>>
+  res: Response<ApiResult<{ user: Omit<User, "password_hash"> }>>
 ) => {
   const userId = req.user?.userId;
 
@@ -97,7 +97,7 @@ export const getCurrentUser = async (
 
   const user = await userService.getUserById(userId);
 
-  const { passwordHash, ...safeUser } = user;
+  const { password_hash, ...safeUser } = user;
 
   res.status(200).json({
     success: true,

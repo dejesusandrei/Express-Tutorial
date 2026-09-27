@@ -2,7 +2,7 @@ import argon2 from "argon2";
 import crypto from "node:crypto";
 
 import type { User } from "../types/User.js";
-import type { RegisterInput } from "../schema/user.schema.js";
+import type { CreateUserInput } from "../schema/user.schema.js";
 
 import { generateAccessToken } from "../utils/jwt.js";
 import * as userRepository from "../repositories/user.repository.js";
@@ -11,21 +11,20 @@ import { AppError } from "../errors/AppError.js";
 import { LoginResult } from "../types/Login.js";
 
 export const register = async (
-  data: RegisterInput
+  data: CreateUserInput
 ): Promise<User> => {
   const { name, email, password } = data;
 
-  const passwordHash = await argon2.hash(password);
+  const password_hash = await argon2.hash(password);
 
-  const user: User = {
-    id: crypto.randomUUID(),
+  const user = await userRepository.create({
     name,
     email,
-    passwordHash,
-    role: 'user'
-  };
+    password_hash,
+    role: "user"
+  });
 
-  return userRepository.create(user);
+  return user;
 };
 
 export const login = async (
@@ -39,7 +38,7 @@ export const login = async (
     throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIAL');
   }
 
-  const passwordValid = await argon2.verify(user.passwordHash, password);
+  const passwordValid = await argon2.verify(user.password_hash, password);
 
   if(!passwordValid){
     throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIAL');
