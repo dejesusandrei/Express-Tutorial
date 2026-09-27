@@ -10,11 +10,11 @@ import { tr } from "zod/v4/locales/index.js";
 
 export const register = async (
   req: Request,
-  res: Response<ApiResult<{ user: Omit<User, "passwordHash"> }>>
+  res: Response<ApiResult<{ user: Omit<User, "password_hash"> }>>
 ) => {
   const user = await authService.register(req.body);
 
-  const { passwordHash, ...safeUser } = user;
+  const { password_hash, ...safeUser } = user;
 
   res.status(201).json({
     success: true,
@@ -27,13 +27,13 @@ export const register = async (
 export const login = async (
   req: Request,
   res: Response<ApiResult<{
-    user: Omit<User, "passwordHash">;
+    user: Omit<User, "password_hash">;
     accessToken: string
   }>>
 ) => {
   const result = await authService.login(req.body);
 
-  const { passwordHash, ...safeUser } = result.user;
+  const { password_hash, ...safeUser } = result.user;
 
   res.status(200).json({
     success: true,

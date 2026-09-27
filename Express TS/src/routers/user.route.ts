@@ -1,5 +1,5 @@
 import { Router } from "express";
-import {  getUsers, getUserById, getCurrentUser, createUser, deleteUser } from '../controllers/user.controller'
+import {  getUsers, getUserById, getCurrentUser, deleteUser } from '../controllers/user.controller'
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/requireRole";
 
@@ -27,14 +27,6 @@ router.get(
 router.get(
   '/:id',
   asyncHandler(getUserById)
-);
-
-
-// POST
-router.post(
-  '/',
-  validate(CreateUserSchema),
-  asyncHandler(createUser)
 );
 
 // DELETE

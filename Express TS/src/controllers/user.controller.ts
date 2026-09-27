@@ -42,25 +42,6 @@ export const getUserById = async (
   });
 };
 
-
-// POST
-export const createUser = async (
-  req: Request,
-  res: Response<ApiResult<{ user: Omit<User, "password_hash">}>>
-) => {
-  const user = await userService.createUser(req.body);
-
-  const { password_hash, ...safeUser } = user;
-
-  res.status(201).json({
-    success: true,
-    data: {
-      user: safeUser
-    }
-  });
-};
-
-
 // DELETE
 export const deleteUser = async (
   req: Request,
