@@ -35,13 +35,13 @@ export const login = async (
   const user = await userRepository.findByEmail(email);
   
   if(!user){
-    throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIAL');
+    throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
   }
 
   const passwordValid = await argon2.verify(user.password_hash, password);
 
   if(!passwordValid){
-    throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIAL');
+    throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
   }
 
   const accessToken = generateAccessToken(user.id);
