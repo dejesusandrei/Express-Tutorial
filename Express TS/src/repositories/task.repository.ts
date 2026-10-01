@@ -78,16 +78,17 @@ export const updateForUser = async (
   return result.rows[0];
 };
 
-export const deleteById = async (
-  id: string
+export const deleteByIdForUser = async (
+  taskId: string,
+  owner_id: string
 ): Promise<Task | undefined> => {
   const result = await pool.query<Task>(
     `
       DELETE FROM tasks
-      WHERE id = $1
+      WHERE id = $1 AND owner_id = $2
       RETURNING *;
     `,
-    [id]
+    [taskId, owner_id]
   );
 
   return result.rows[0];

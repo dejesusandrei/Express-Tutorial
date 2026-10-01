@@ -63,26 +63,11 @@ export const deleteTaskForUser = async (
   taskId: string,
   owner_id: string
 ): Promise<Task> => {
-  const task = await taskRepository.findById(taskId, owner_id);
+  const task = await taskRepository.deleteByIdForUser(taskId, owner_id);
 
   if (!task) {
     throw new AppError("Task not found", 404, "TASK_NOT_FOUND");
   }
 
-  const user = await userService.getUserById(owner_id);
-
-  const isOwner = task.owner_id === owner_id; // true
-  const isAdmin = user.role === "admin"; // false: bcs you are user role
-
-  if (!isOwner && !isAdmin) {
-    throw new AppError("You do not have permission to delete this task", 403, "FORBIDDEN");
-  }
-
-  const deletedTask = await taskRepository.deleteById(taskId);
-
-  if (!deletedTask) {
-    throw new AppError("Task not found", 404, "TASK_NOT_FOUND");
-  }
-
-  return deletedTask;
+  return task;
 };
