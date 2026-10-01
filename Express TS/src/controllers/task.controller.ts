@@ -7,11 +7,17 @@ import type { ApiResult } from "../types/Api.js";
 
 
 // GET
-export const getTasks = async (
+export const getMyTask = async (
   req: Request,
   res: Response<ApiResult<{ tasks: Task[] }>>
 ) => {
-  const tasks = await taskService.getTask();
+  const userId = req.user?.userId;
+
+  if (!userId) {
+    throw new AppError("Authentication required", 401, "AUTH_REQUIRED");
+  }
+
+  const tasks = await taskService.getTask(userId);
 
   res.status(200).json({
     success: true,
@@ -61,10 +67,9 @@ export const createTask = async (
 
   const { title, completed } = req.body;
 
-  const task = await taskService.createTask({
+  const task = await taskService.createTask(userId, {
     title,
     completed,
-    ownerId: userId
   });
 
   res.status(201).json({
@@ -72,6 +77,37 @@ export const createTask = async (
     data: {
       task
     },
+  });
+};
+
+// UPDATE
+export const updateTask = async (
+  req: Request,
+  res: Response<ApiResult<{ task: Task }>>
+) => {
+  const userId = req.user?.userId;
+
+  if (!userId) {
+    throw new AppError("Authentication required", 401, "AUTH_REQUIRED");
+  }
+
+  const { id } = req.params;
+
+  if (typeof id !== "string") {
+    throw new AppError("Invalid task ID", 400,"INVALID_TASK_ID");
+  }
+
+  const task = await taskService.updateTaskForUser(
+    id,
+    userId,
+    req.body
+  );
+
+  res.status(200).json({
+    success: true,
+    data: {
+      task
+    }
   });
 };
 

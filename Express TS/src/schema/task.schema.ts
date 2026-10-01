@@ -8,10 +8,18 @@ export const CreateTaskSchema = z.object({
     .max(100, 'maximum 200 characters'),
 
   completed: 
-    z.boolean(),
+    z.boolean()
+    .optional()
+    .default(false)
+});
 
-  ownerId:
-    z.string()
+export const UpdateTaskSchema = z.object({
+  title: z
+    .string()
+    .min(1, "Title is required")
+    .max(200, "Title must not exceed 200 characters"),
+
+  completed: z.boolean()
 });
 
 export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
