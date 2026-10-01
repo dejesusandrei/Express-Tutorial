@@ -126,7 +126,7 @@ export const deleteTask = async (
   const { id } = req.params;
 
   if (typeof id !== "string") {
-    throw new AppError("Invalid task ID" , 400, "INVALID_TASK_ID");
+    throw new AppError("Invalid task ID", 400, "INVALID_TASK_ID");
   }
 
   const task = await taskService.deleteTaskForUser(id, userId);

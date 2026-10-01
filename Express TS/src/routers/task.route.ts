@@ -6,7 +6,7 @@ import { validate } from "../middleware/validate.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 
 // Schema
-import { CreateTaskSchema, UpdateTaskSchema } from "../schema/task.schema";
+import { CreateTaskSchema, TaskIdSchema, UpdateTaskSchema } from "../schema/task.schema";
 import { authMiddleware } from "../middleware/authMiddleware";
 
 const router = Router();
@@ -21,6 +21,7 @@ router.get(
 router.get(
   "/:id", 
   authMiddleware,
+  validate(TaskIdSchema, "params"),
   asyncHandler(getTaskById)
 );
 
@@ -36,6 +37,7 @@ router.post(
 router.put(
   "/:id",
   authMiddleware,
+  validate(TaskIdSchema, "params"),
   validate(UpdateTaskSchema),
   asyncHandler(updateTask)
 );
@@ -44,6 +46,7 @@ router.put(
 router.delete(
   '/:id',
   authMiddleware,
+  validate(TaskIdSchema, "params"),
   asyncHandler(deleteTask)
 );
 

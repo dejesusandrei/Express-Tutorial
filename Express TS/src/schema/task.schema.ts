@@ -22,4 +22,8 @@ export const UpdateTaskSchema = z.object({
   completed: z.boolean()
 });
 
+export const TaskIdSchema = z.object({
+  id: z.string().uuid("Invalid task ID")
+});
+
 export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
