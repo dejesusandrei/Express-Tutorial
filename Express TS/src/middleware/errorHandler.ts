@@ -8,13 +8,26 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   // Handle expected application errors
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
-      message: err.message
+      success: false,              
+      error: {                    
+        status: err.statusCode,    
+        message: err.message,      
+        code: err.code,            
+        ...(err.details && {       
+          details: err.details     
+        })                         
+      }                            
     });
     return;
   }
 
   // Handle unexpected errors
   res.status(500).json({
-    message: "Internal server error"
+    success: false,               
+    error: {                      
+      status: 500,                
+      message: "Internal server error",
+      code: "INTERNAL_SERVER_ERROR"     
+    }
   });
 };

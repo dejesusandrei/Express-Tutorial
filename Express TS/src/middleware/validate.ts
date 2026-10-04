@@ -10,8 +10,20 @@ export const validate = (
     const result = schema.safeParse(req[source]);
 
     if (!result.success) {
+      const details: Record<string, string[]> = {};
+
+      for (const issue of result.error.issues) {
+        const field = issue.path.join(".");
+
+        if (!details[field]) {
+          details[field] = [];
+        }
+
+        details[field].push(issue.message);
+      }
+
       return next(
-        new AppError("Validation failed", 400, "VALIDATION_ERROR")
+        new AppError("Validation failed", 400, "VALIDATION_ERROR", details)
       );
     }
     req[source] = result.data;

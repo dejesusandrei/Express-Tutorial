@@ -7,6 +7,7 @@ export type ApiError = {
   status: number;
   message: string;
   code?: string;
+  details?: Record<string, string[]>;
 };
 
 export type ApiResult<T> =
