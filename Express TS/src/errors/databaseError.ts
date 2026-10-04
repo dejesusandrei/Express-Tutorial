@@ -13,6 +13,10 @@ export const handleDatabaseError = (
     if ( dbError.code === "23505" && dbError.constraint === "users_email_unique" ) {
       throw new AppError( "Email already exists", 409, "EMAIL_ALREADY_EXISTS");
     }
+
+    if (dbError.code === "23503") {
+      throw new AppError("Invalid user reference", 400, "INVALID_USER_REFERENCE");
+    }
   }
 
   throw new AppError(
