@@ -1,7 +1,5 @@
-import argon2 from "argon2";
 import * as userRepository from '../repositories/user.repository'
 import type { User } from '../types/User'
-import type { CreateUserInput } from "../schema/user.schema.js";
 import { AppError } from "../errors/AppError.js";
 
 export const getUsers = async (): Promise<User[]> => {

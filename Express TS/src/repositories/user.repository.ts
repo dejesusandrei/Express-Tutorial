@@ -1,9 +1,8 @@
 import type { User, CreateUserData } from '../types/User'
-import { handleDatabaseError } from '../errors/databaseError' 
-import { pool } from "../config/database.js";
+import { query } from "../utils/databaseQueryHelper";
 
 export const findAll = async (): Promise<User[]> => {
-  const result = await pool.query(
+  const result = await query<User>(
     `
       SELECT id, name, email, password_hash, role, created_at
       FROM users
@@ -17,7 +16,7 @@ export const findAll = async (): Promise<User[]> => {
 export const findById = async (
   id: string
 ): Promise<User | undefined> => {
-  const result = await pool.query(
+  const result = await query<User>(
     `
       SELECT id, name, email, role, password_hash, created_at
       FROM users
@@ -32,7 +31,7 @@ export const findById = async (
 export const findByEmail = async (
   email: string
 ): Promise<User | undefined> =>{
-  const result = await pool.query(
+  const result = await query<User>(
     `
       SELECT id, name, email, role, password_hash, created_at
       FROM users
@@ -47,12 +46,11 @@ export const findByEmail = async (
 export const create = async (
   user: CreateUserData
 ): Promise<User> => {
-  try {
-    const result = await pool.query(
+    const result = await query<User>(
       `
         INSERT INTO users (name, email, password_hash, role)
         VALUES ($1, $2, $3, $4)
-        RETURNING name, email, password_hash, role, created_at
+        RETURNING id, name, email, password_hash, role, created_at
       `,
       [
         user.name,
@@ -63,16 +61,12 @@ export const create = async (
     );
   
     return result.rows[0];
-  } catch (error) {
-    return handleDatabaseError(error);
-  }
-
 }
 
 export const deleteById = async (
   id: string
 ): Promise<User | undefined> => {
-  const result = await pool.query<User>(
+  const result = await query<User>(
     `
       DELETE FROM users
       WHERE id = $1
