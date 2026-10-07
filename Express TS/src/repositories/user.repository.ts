@@ -1,5 +1,10 @@
 import type { User, CreateUserData } from '../types/User'
 import { query } from "../utils/databaseQueryHelper";
+import { transaction } from "../utils/databaseTransaction";
+
+
+// query = normal DB operation
+// transaction = multiple DB operations that need to be executed as a single unit of work
 
 export const findAll = async (): Promise<User[]> => {
   const result = await query<User>(
@@ -77,3 +82,39 @@ export const deleteById = async (
 
   return result.rows[0];
 }
+
+
+// TRANSACTIONAL EXAMPLE
+export const createUserWithProfile = async () => {
+  const result = await transaction(async (client) => {
+    const userResult = await client.query<User>(
+      `
+        INSERT INTO users (name, email, password_hash, role)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id
+      `,
+      [
+        "Juan",
+        "juan@example.com",
+        "hashed-password",
+        "user"
+      ]
+    );
+  
+    const userId = userResult.rows[0].id;
+  
+    await client.query(
+      `
+        INSERT INTO profiles (user_id)
+        VALUES ($1)
+      `,
+      [
+        userId
+      ]
+    );
+
+    return userId;
+  });
+
+  
+};
