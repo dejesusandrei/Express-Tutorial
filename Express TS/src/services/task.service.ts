@@ -1,6 +1,5 @@
 import type { Task, CreateTaskData } from '../types/Task'
 import * as taskRepository from '../repositories/task.repository'
-import * as userService from '../services/user.service'
 import { type CreateTaskInput } from '../schema/task.schema'
 import { AppError } from "../errors/AppError.js";
 
