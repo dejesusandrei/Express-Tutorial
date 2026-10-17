@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import type { Task } from '../types/Task'
 import * as taskService from '../services/task.service'
+import { getPaginatedTasks } from "../services/task.service.js";
 
 import { AppError } from "../errors/AppError.js";
 import type { ApiResult } from "../types/Api.js";
@@ -9,7 +10,14 @@ import type { ApiResult } from "../types/Api.js";
 // GET
 export const getMyTask = async (
   req: Request,
-  res: Response<ApiResult<{ tasks: Task[] }>>
+  res: Response<ApiResult<{ tasks: Task[] }> & {
+    pagination?: {
+      currentPage: number;
+      limit: number;
+      totalItems: number;
+      totalPages: number;
+    };
+  }>
 ) => {
   const userId = req.user?.userId;
 
@@ -17,13 +25,23 @@ export const getMyTask = async (
     throw new AppError("Authentication required", 401, "AUTH_REQUIRED");
   }
 
-  const tasks = await taskService.getTask(userId);
+  const { page, limit } = res.locals.validatedQuery as {
+    page: number;
+    limit: number;
+  };
+
+  const result = await taskService.getPaginatedTasks(
+    userId,
+    page,
+    limit
+  );
 
   res.status(200).json({
     success: true,
     data: {
-      tasks,
+      tasks: result.tasks,
     },
+    pagination: result.pagination,
   });
 };
 
@@ -138,3 +156,4 @@ export const deleteTask = async (
     }
   });
 };
+

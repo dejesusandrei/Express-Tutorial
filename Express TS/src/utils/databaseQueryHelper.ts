@@ -13,6 +13,7 @@ export const query = async <T extends QueryResultRow>(
   try {
     return await pool.query<T>(text, values);
   } catch (error) {
+    console.error("Database query failed:", error);
     return handleDatabaseError(error);
   }
 };

@@ -70,3 +70,28 @@ export const deleteTaskForUser = async (
 
   return task;
 };
+
+export const getPaginatedTasks = async (
+  ownerId: string,
+  page: number,
+  limit: number
+)  => {
+  const offset = (page - 1) * limit;
+
+  const [tasks, totalItems] = await Promise.all([
+    taskRepository.findAllPaginated(ownerId, limit, offset),
+    taskRepository.countByOwner(ownerId)
+  ]);
+
+  // Math.ceil is used to round up the total number of pages, 
+  // ensuring that any remaining items that don't fill a complete page are still accounted for in the pagination.
+  return {
+    tasks,
+    pagination: {
+      currentPage: page,
+      limit,
+      totalItems,
+      totalPages: Math.ceil(totalItems / limit)
+    }
+  };
+};

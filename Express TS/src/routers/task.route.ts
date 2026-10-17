@@ -7,6 +7,7 @@ import { asyncHandler } from "../middleware/asyncHandler.js";
 
 // Schema
 import { CreateTaskSchema, TaskIdSchema, UpdateTaskSchema } from "../schema/task.schema";
+import { paginationSchema } from "../schema/pagination.schema.js";
 import { authMiddleware } from "../middleware/authMiddleware";
 
 const router = Router();
@@ -15,6 +16,7 @@ const router = Router();
 router.get(
   "/", 
   authMiddleware,
+  validate(paginationSchema, "query"),
   asyncHandler(getMyTask)
 );
 

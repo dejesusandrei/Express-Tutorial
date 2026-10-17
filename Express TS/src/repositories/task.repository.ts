@@ -94,3 +94,35 @@ export const deleteByIdForUser = async (
 
   return result.rows[0];
 }
+
+export const findAllPaginated = async (
+  owner_id: string,
+  limit: number,
+  offset: number
+) => {
+  const result = await query<Task>(
+    `
+      SELECT id, owner_id, title, completed, created_at
+      FROM tasks
+      WHERE owner_id = $1
+      ORDER BY created_at DESC, id DESC
+      LIMIT $2 OFFSET $3
+    `,
+    [owner_id, limit, offset]
+  );
+  return result.rows;
+};
+
+export const countByOwner = async (
+  owner_id: string
+) => {
+  const result = await query<{ count: string }>(
+    `
+      SELECT COUNT(*) AS count
+      FROM tasks
+      WHERE owner_id = $1
+    `,
+    [owner_id]
+  );
+  return Number(result.rows[0].count);
+};

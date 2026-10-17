@@ -4,7 +4,7 @@ import { AppError } from "../errors/AppError";
 
 export const validate = (
   schema: ZodType,
-  source: "body" | "params" = "body"
+  source: "body" | "params" | "query" = "body"
 ) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req[source]);
@@ -26,7 +26,13 @@ export const validate = (
         new AppError("Validation failed", 400, "VALIDATION_ERROR", details)
       );
     }
-    req[source] = result.data;
+    
+    if (source === "query") {
+      res.locals.validatedQuery = result.data;
+    } else {
+      req[source] = result.data;
+    }
+    
     next();
   };
 };
