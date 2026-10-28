@@ -26,7 +26,6 @@ export const register = async (
 };
 
 
-
 // Setting	Purpose
 // httpOnly: true	Hindi direktang mababasa ng browser JavaScript ang cookie.
 // secure	HTTPS lang sa production.
@@ -96,7 +95,6 @@ export const logout = async (
   req: Request,
   res: Response<ApiResult<{ message: string }>>
 ) => {
-  console.log("Cookies received:", req.cookies);
   const token = req.cookies?.refreshToken as string | undefined;
 
   await authService.logout(token);
