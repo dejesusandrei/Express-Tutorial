@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { env } from "./config/env.js";
+import cookieParser from "cookie-parser";
 
 
 // Global Middleware
@@ -30,6 +31,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(cookieParser());
 app.use(requestLogger);
 
 

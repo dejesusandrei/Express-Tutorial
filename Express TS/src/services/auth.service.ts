@@ -73,3 +73,54 @@ export const login = async (
     refreshToken
   };
 }
+
+
+export const refresh = async (
+  token: string
+): Promise<{ accessToken: string, refreshToken: string }> => {
+  const tokenHash = hashRefreshToken(token);
+
+  // Check if the refresh token exists and is active
+  const session = await refreshTokenRepository.findActiveByTokenHash(tokenHash);
+
+  if(!session){
+    throw new AppError("Invalid or expired refresh token", 401, "INVALID_REFRESH_TOKEN");
+  }
+
+  // Generate a new refresh token and hash it
+  const newRefreshToken = generateRefreshToken();
+  const newTokenHash = hashRefreshToken(newRefreshToken);
+  const expiresAt = new Date(
+    Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+  );
+
+  // Revoke the old refresh token and create a new one
+  await refreshTokenRepository.revokeById(session.id);
+  await refreshTokenRepository.createrefreshToken(
+    session.user_id,
+    newTokenHash,
+    expiresAt
+  );
+
+  // Generate a new access token
+  const accessToken = generateAccessToken(session.user_id);
+
+  return {
+    accessToken,
+    refreshToken: newRefreshToken
+  };
+};
+
+export const logout = async (
+  token: string | undefined
+): Promise<void> => {
+  if(!token) return; // If no token is provided, simply return without doing anything.
+
+  const tokenHash = hashRefreshToken(token);
+
+  const session = await refreshTokenRepository.findActiveByTokenHash(tokenHash);
+
+  if(session){
+    await refreshTokenRepository.revokeById(session.id);
+  }
+};

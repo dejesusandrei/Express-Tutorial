@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { register, login } from "../controllers/auth.controller.js";
+import { register, login, refresh, logout } from "../controllers/auth.controller.js";
 import { validate } from "../middleware/validate.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import { loginRateLimit } from "../middleware/rateLimit.js";
@@ -21,6 +21,16 @@ router.post(
   loginRateLimit,
   validate(LoginSchema),
   asyncHandler(login)
+);
+
+router.post(
+  "/refresh",
+  asyncHandler(refresh)
+);
+
+router.post(
+  '/logout',
+  asyncHandler(logout)
 );
 
 export default router;
