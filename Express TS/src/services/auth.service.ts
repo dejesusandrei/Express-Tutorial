@@ -102,7 +102,22 @@ export const refresh = async (
   );
 
   if (!newSession) {
-    throw new AppError( "Invalid or expired refresh token", 401, "INVALID_REFRESH_TOKEN");
+    // rotate() failed. Find out WHY, because the reason matters:
+    //  - token exists AND was already revoked -> REUSE (possible theft)
+    //  - token doesn't exist, or just expired -> plain invalid token
+    const existing = await refreshTokenRepository.findByTokenHash(oldTokenHash);
+
+    if (existing?.revoked_at) {
+      // A revoked token should never come back. The real user already rotated
+      // it, so whoever is presenting it now probably copied it. We can't tell
+      // which side is the attacker, so kill EVERY session of this user and
+      // force a fresh login on all devices.
+      await refreshTokenRepository.revokeAllForUser(existing.user_id);
+
+      throw new AppError("Refresh token reuse detected. Please log in again.", 401, "REFRESH_TOKEN_REUSED");
+    }
+
+    throw new AppError("Invalid or expired refresh token", 401, "INVALID_REFRESH_TOKEN");
   }
 
   const accessToken = generateAccessToken(newSession.user_id);

@@ -57,6 +57,24 @@ export const findActiveByTokenHash = async (
   return result.rows[0] ?? null;
 };
 
+// Find a session by hash in ANY state (active, revoked, or expired).
+// Used for reuse detection: if rotate() fails, this tells us WHY it failed.
+export const findByTokenHash = async (
+  tokenHash: string
+): Promise<RefreshSession | null> => {
+  const result = await query<RefreshSession>(
+    `
+      SELECT id, user_id, token_hash, expires_at, created_at, revoked_at
+      FROM refresh_sessions
+      WHERE token_hash = $1
+      LIMIT 1
+    `,
+    [tokenHash]
+  );
+
+  return result.rows[0] ?? null;
+};
+
 /**
  * Token rotation in ONE SQL statement.
  *
