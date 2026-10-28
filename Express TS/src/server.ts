@@ -16,6 +16,7 @@ import authRouter from "./routers/auth.route.js";
 // Error Middleware
 import notFound from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { verifyOrigin } from "./middleware/verifyOrigin.js";
 
 const app = express();
 
@@ -24,8 +25,7 @@ const app = express();
 // Global Middleware
 // =========================
 app.use(helmet());
-app.use(
-  cors({
+app.use(cors({
     origin: env.frontendUrl,
     credentials: true
   })
@@ -39,7 +39,7 @@ app.use(requestLogger);
 // Routes
 // =========================
 
-app.use("/api/auth", authRouter);
+app.use("/api/auth", verifyOrigin, authRouter);
 app.use("/api/users", userRouter);
 app.use("/api/tasks", taskRoute);
 
