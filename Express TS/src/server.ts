@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 
 // Global Middleware
 import requestLogger from "./middleware/requestLogger.js";
+import { globalRateLimit } from "./middleware/rateLimit.js";
 
 // Routers
 import userRouter from "./routers/user.route.js";
@@ -30,6 +31,7 @@ app.use(cors({
     credentials: true
   })
 );
+app.use(globalRateLimit); // apply rate limiting to all requests
 app.use(express.json());
 app.use(cookieParser());
 app.use(requestLogger);
