@@ -1,13 +1,12 @@
 import { z } from "zod";
+import { loginPasswordSchema } from "./password.schema.js";
 
 export const LoginSchema = z.object({
   email: z
     .string()
     .email("Invalid email address"),
 
-  password: z
-    .string()
-    .min(1, "Password is required")
+  password: loginPasswordSchema,
 });
 
 export type LoginInput = z.infer<typeof LoginSchema>;
