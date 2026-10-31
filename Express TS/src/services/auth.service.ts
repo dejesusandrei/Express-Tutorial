@@ -9,14 +9,40 @@ import { generateAccessToken } from "../utils/jwt.js";
 import { generateRefreshToken, hashRefreshToken } from "../utils/refreshToken.js";
 
 import * as userRepository from "../repositories/user.repository.js";
+import * as userLockoutRepository from "../repositories/userLockout.repository.js";
 import * as refreshTokenRepository from "../repositories/refreshToken.repository.js";
 import { AppError } from "../errors/AppError.js";
 
 export const REFRESH_TOKEN_EXPIRY_DAYS = 7;
 
+// Account lockout: 5 wrong passwords in a row -> locked for 15 minutes.
+const MAX_FAILED_LOGINS = 5;
+const LOCK_MINUTES = 15;
+
+// Pekeng hash para sa login.
+//
+// Bakit kailangan: kapag walang user na may ganoong email, wala tayong
+// totoong hash na ichecheck. Kung agad tayong mag-reject, mabilis ang sagot.
+// Kapag may user, mabagal ang argon2 (sinadya iyon). Sa bilis ng sagot,
+// malalaman ng magnanakaw kung may account ang email. Kaya kahit walang user,
+// pinapatakbo pa rin natin ang argon2.verify sa pekeng hash para pareho ang bagal.
+//
+// Paano gumagana:
+// - Sa simula, walang laman (null) ang dummyHashPromise.
+// - Sa unang tawag ng getDummyHash(), gagawa ng hash at itatabi.
+// - Sa mga susunod na tawag, ang itinabing hash na ang ibabalik. Isang beses lang
+//   ang trabaho.
+// - "??=" ay ibig sabihin: "ilagay lang kung wala pang laman."
+let dummyHashPromise: Promise<string> | null = null;
+
+const getDummyHash = (): Promise<string> =>
+  (dummyHashPromise ??= argon2.hash("not-a-real-password"));
+
 // One place to compute the expiry date, so login and refresh can't drift apart.
 const getRefreshTokenExpiry = (): Date =>
   new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+
 
 // ---------------------------------------------------------------------------
 // REGISTER
@@ -51,17 +77,38 @@ export const login = async (
 
   const user = await userRepository.findByEmail(email);
 
-  // Same error for "user not found" and "wrong password" so attackers can't
-  // find out which emails are registered.
+  const invalidCredentials = () => new AppError("Invalid email or password", 401, "INVALID_CREDENTIALS");
+
+  // Case 1: no such user.
+  // Without the next line, this path returns in ~1 ms (no hashing), while a
+  // real user takes ~100 ms (argon2 is slow on purpose). An attacker with a
+  // stopwatch could tell "email exists" from the response time (a timing
+  // attack). So we burn the same time on a fake hash.
   if (!user) {
-    throw new AppError("Invalid email or password", 401, "INVALID_CREDENTIALS");
+    await argon2.verify(await getDummyHash(), password);
+    throw invalidCredentials();
+  }
+
+  // Case 2: account is locked. Same time-burning, same generic error.
+  if (user.locked_until && user.locked_until > new Date()) {
+    await argon2.verify(await getDummyHash(), password);
+    throw invalidCredentials();
   }
 
   const passwordValid = await argon2.verify(user.password_hash, password);
 
+  // Case 3: wrong password. Count it. After MAX_FAILED_LOGINS in a row the
+  // database sets locked_until (see userLockout.repository.ts).
   if (!passwordValid) {
-    throw new AppError("Invalid email or password", 401, "INVALID_CREDENTIALS");
+    await userLockoutRepository.recordFailedLogin(
+      user.id,
+      MAX_FAILED_LOGINS,
+      LOCK_MINUTES
+    );
+    throw invalidCredentials();
   }
+  // Case 4: success. Clear the counter so old mistakes don't pile up.
+  await userLockoutRepository.resetFailedLogins(user.id);
 
   const accessToken = generateAccessToken(user.id);
 
