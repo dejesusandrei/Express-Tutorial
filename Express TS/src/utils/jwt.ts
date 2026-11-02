@@ -8,10 +8,12 @@ import { AppError } from "../errors/AppError.js";
  * JWT (access token): the "wristband" at a concert
  * ============================================================================
  * After login, the server gives you a wristband (the token). You show it at
- * every door (request). The guard checks 3 things:
+ * every door (request). The guard checks 4 things:
  *   1. Is the stamp real?        -> the signature (made with our secret)
  *   2. Is it from OUR concert?   -> issuer / audience
  *   3. Has it expired?           -> exp (we use 15 minutes)
+ *   4. Is the guest still on the list? -> the session (checked in the
+ *                                  auth middleware, using sessionId)
  *
  * The token is only SIGNED, not hidden. Anyone can read what's inside
  * (try pasting one on jwt.io). So never put passwords or private data in it.
@@ -20,6 +22,9 @@ import { AppError } from "../errors/AppError.js";
 
 export type AccessTokenPayload = {
   userId: string;
+  // Which login session this token belongs to. When that session is revoked
+  // (logout, reuse detection), the token stops working right away.
+  sessionId: string;
 };
 
 // Settings in one place, so sign and verify can never disagree.
@@ -36,8 +41,11 @@ const JWT_AUDIENCE = "express-tutorial-client"; // who the token is meant for
 // ---------------------------------------------------------------------------
 // Create a token (login and refresh call this)
 // ---------------------------------------------------------------------------
-export const generateAccessToken = (userId: string): string => {
-  return jwt.sign({ userId }, env.jwtSecret, {
+export const generateAccessToken = (
+  userId: string,
+  sessionId: string
+): string => {
+  return jwt.sign({ userId, sessionId }, env.jwtSecret, {
     algorithm: JWT_ALGORITHM, // be explicit; don't rely on library defaults
     expiresIn: ACCESS_TOKEN_EXPIRES_IN, // short life = small damage if stolen
     issuer: JWT_ISSUER,
@@ -75,15 +83,17 @@ export const verifyAccessToken = (token: string): AccessTokenPayload => {
   // jwt.verify can return a string or an object, and we can't trust what is
   // inside, so check the shape instead of just writing "as AccessTokenPayload".
   if (
-      typeof decoded !== "object" ||
-      decoded === null ||
-      !("userId" in decoded) ||
-      typeof decoded.userId !== "string"
-    ) {
-      throw new AppError("Invalid token", 401, "INVALID_TOKEN");
-    }
+    typeof decoded !== "object" ||
+    decoded === null ||
+    !("userId" in decoded) ||
+    typeof decoded.userId !== "string" ||
+    !("sessionId" in decoded) ||
+    typeof decoded.sessionId !== "string"
+  ) {
+    throw new AppError("Invalid access token", 401, "INVALID_TOKEN");
+  }
 
-  return { userId: decoded.userId };
+  return { userId: decoded.userId, sessionId: decoded.sessionId };
 };
 
 /**
@@ -95,14 +105,15 @@ export const verifyAccessToken = (token: string): AccessTokenPayload => {
  *    Put it in .env. Never commit .env, never hardcode the secret.
  *    If the secret leaks, anyone can make valid tokens for any user.
  *
- * 2. Tokens can't be "taken back": after logout or a password change, an
- *    existing access token still works until it expires (max 15 minutes).
- *    That is the price of short-lived tokens, and it is why we keep them short.
+ * 2. A JWT alone can't be "taken back". That is why every token carries a
+ *    sessionId, and authMiddleware checks that the session is still alive.
+ *    After logout the session is revoked, so the token stops working at once
+ *    (401 SESSION_ENDED), even though it has not expired yet.
  *
- * 3. Only userId is in the token. Good. Role and other data are read from the
- *    database on each request, so a demoted admin loses power right away.
+ * 3. Only userId and sessionId are in the token. Good. Role and other data
+ *    are read from the database, so a demoted admin loses power right away.
  *
- * 4. After adding issuer/audience, OLD tokens (made without them) are rejected.
+ * 4. Old tokens (made without sessionId, issuer, or audience) are rejected.
  *    In development just log in again.
  * ============================================================================
  */

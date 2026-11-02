@@ -146,6 +146,28 @@ export const revokeAllForUser = async (
   );
 };
 
+// Is this session still alive? (not revoked and not expired)
+// The auth middleware asks this on every protected request, so that an access
+// token stops working the moment its session is revoked (logout, reuse
+// detection, password reset). SELECT 1 + LIMIT 1 keeps it as cheap as possible.
+export const isSessionActive = async (
+  sessionId: string
+): Promise<boolean> => {
+  const result = await query(
+    `
+      SELECT 1
+      FROM refresh_sessions
+      WHERE id = $1
+        AND revoked_at IS NULL
+        AND expires_at > NOW()
+      LIMIT 1
+    `,
+    [sessionId]
+  );
+
+  return result.rows.length > 0;
+};
+
 // Housekeeping: delete sessions that expired or were revoked more than 30 days ago.
 // Without this the table grows forever. Run it from a cron job or scheduled task.
 export const deleteExpired = async (): Promise<number> => {

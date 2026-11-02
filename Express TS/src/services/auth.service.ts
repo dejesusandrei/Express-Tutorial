@@ -110,17 +110,20 @@ export const login = async (
   // Case 4: success. Clear the counter so old mistakes don't pile up.
   await userLockoutRepository.resetFailedLogins(user.id);
 
-  const accessToken = generateAccessToken(user.id);
-
   // The raw token goes to the client (cookie). Only the hash goes to the DB.
   const refreshToken = generateRefreshToken();
   const tokenHash = hashRefreshToken(refreshToken);
 
-  await refreshTokenRepository.createRefreshToken(
+  // Create the session FIRST, because the access token needs its id.
+  const session = await refreshTokenRepository.createRefreshToken(
     user.id,
     tokenHash,
     getRefreshTokenExpiry()
   );
+
+  // The access token is tied to this session. When the session is revoked
+  // (logout), the access token stops working immediately.
+  const accessToken = generateAccessToken(user.id, session.id);
 
   return { user, accessToken, refreshToken };
 };
@@ -163,11 +166,11 @@ export const refresh = async (
 
       throw new AppError("Refresh token reuse detected. Please log in again.", 401, "REFRESH_TOKEN_REUSED");
     }
-
     throw new AppError("Invalid or expired refresh token", 401, "INVALID_REFRESH_TOKEN");
   }
 
-  const accessToken = generateAccessToken(newSession.user_id);
+  // Tie the new access token to the NEW session (rotation made a new row).
+  const accessToken = generateAccessToken(newSession.user_id, newSession.id);
 
   return { accessToken, refreshToken: newRefreshToken };
 };
@@ -181,10 +184,12 @@ export const refresh = async (
 export const logout = async (
   token: string | undefined
 ): Promise<void> => {
+  console.log("[DEV] logout: cookie token received?", !!token);
   if (!token) return;
 
   const tokenHash = hashRefreshToken(token);
   const session = await refreshTokenRepository.findActiveByTokenHash(tokenHash);
+    console.log("[DEV] logout: session to revoke:", session?.id ?? "NONE"); 
 
   if (session) {
     await refreshTokenRepository.revokeById(session.id);

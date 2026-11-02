@@ -21,11 +21,15 @@ router.get(
 
 router.get(
   '/',
+  authMiddleware,
+  requireRole('admin'),
   asyncHandler(getUsers)
 );
 
 router.get(
   '/:id',
+  authMiddleware,
+  requireRole('admin'),
   asyncHandler(getUserById)
 );
 
