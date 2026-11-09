@@ -11,6 +11,7 @@ import { generateRefreshToken, hashRefreshToken } from "../utils/refreshToken.js
 import * as userRepository from "../repositories/user.repository.js";
 import * as userLockoutRepository from "../repositories/userLockout.repository.js";
 import * as refreshTokenRepository from "../repositories/refreshToken.repository.js";
+import * as emailVerificationService from "./emailVerification.service.js";
 import { AppError } from "../errors/AppError.js";
 
 export const REFRESH_TOKEN_EXPIRY_DAYS = 7;
@@ -56,12 +57,23 @@ export const register = async (
 
   const password_hash = await argon2.hash(password);
 
-  return userRepository.create({
+  const user = await userRepository.create({
     name,
     email,
     password_hash,
     role: "user"
   });
+
+  // Start email verification. If this fails (for example a database hiccup),
+  // the account still exists and the user can use "resend verification", so
+  // we log the problem instead of failing the whole registration.
+  await emailVerificationService
+    .sendVerificationEmailFor(user)
+    .catch((error: Error) => {
+      console.error("Could not start email verification:", error.message);
+    });
+
+  return user;
 };
 
 // ---------------------------------------------------------------------------
@@ -109,6 +121,14 @@ export const login = async (
   }
   // Case 4: success. Clear the counter so old mistakes don't pile up.
   await userLockoutRepository.resetFailedLogins(user.id);
+
+  // Case 5: right password, but the email was never verified.
+  // This check comes AFTER the password check on purpose. Only someone who
+  // knows the correct password learns the account exists and is unverified,
+  // so strangers can't use this error to discover registered emails.
+  if (!user.email_verified_at) {
+    throw new AppError("Please verify your email before logging in", 403, "EMAIL_NOT_VERIFIED");
+  }
 
   // The raw token goes to the client (cookie). Only the hash goes to the DB.
   const refreshToken = generateRefreshToken();

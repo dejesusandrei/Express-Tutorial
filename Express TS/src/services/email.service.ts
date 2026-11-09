@@ -26,3 +26,19 @@ export const sendPasswordResetEmail = async (
   console.log(`[DEV EMAIL] To: ${to}`);
   console.log(`[DEV EMAIL] Reset link: ${resetLink}`);
 };
+
+// ---------------------------------------------------------------------------
+// Email verification link (same temporary stub rules as above)
+// ---------------------------------------------------------------------------
+export const sendVerificationEmail = async (
+  to: string,
+  verifyLink: string
+): Promise<void> => {
+  if (env.nodeEnv === "production") {
+    throw new Error("Email provider is not configured yet");
+  }
+
+  // DEV ONLY: never print verification links in production logs.
+  console.log(`[DEV EMAIL] To: ${to}`);
+  console.log(`[DEV EMAIL] Verify link: ${verifyLink}`);
+};

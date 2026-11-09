@@ -121,6 +121,29 @@ export const resetPasswordRateLimit = rateLimit({
   handler: tooManyRequests("Too many attempts. Try again later."),
 });
 
+// ---------------------------------------------------------------------------
+// 7. RESEND-VERIFICATION limiter: stop email bombing
+// ---------------------------------------------------------------------------
+// Every request can send an email to someone. 3 per hour per IP.
+export const resendVerificationRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 3,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: tooManyRequests("Too many requests. Try again later."),
+});
+
+// ---------------------------------------------------------------------------
+// 8. VERIFY-EMAIL limiter: a cheap extra layer against token guessing
+// ---------------------------------------------------------------------------
+export const verifyEmailRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: tooManyRequests("Too many attempts. Try again later."),
+});
+
 /**
  * ============================================================================
  * THINGS TO REMEMBER (the "gotchas")

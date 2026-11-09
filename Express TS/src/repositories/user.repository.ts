@@ -38,7 +38,7 @@ export const findByEmail = async (
 ): Promise<User | undefined> =>{
   const result = await query<User>(
     `
-      SELECT id, name, email, role, password_hash, created_at
+      SELECT id, name, email, role, password_hash, created_at, email_verified_at
       FROM users
       WHERE LOWER(email) = LOWER($1)
     `,
