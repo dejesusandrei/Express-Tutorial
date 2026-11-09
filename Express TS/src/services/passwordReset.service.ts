@@ -4,6 +4,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { env } from "../config/env.js";
 import { AppError } from "../errors/AppError.js";
 
+import {generateSecureToken, hashSecureToken } from '../utils/secureToken.js';
+
 import * as userRepository from "../repositories/user.repository.js";
 import * as passwordResetRepository from "../repositories/passwordReset.repository.js";
 import * as refreshTokenRepository from "../repositories/refreshToken.repository.js";
@@ -27,16 +29,6 @@ import * as emailService from "./email.service.js";
  */
 
 const RESET_TOKEN_EXPIRY_MINUTES = 30;
-
-// 32 random bytes from the operating system's secure random generator,
-// written as 64 hex characters. Impossible to guess.
-// (Never use Math.random() or dates for secrets: those are predictable.)
-const generateResetToken = (): string => randomBytes(32).toString("hex");
-
-// We store only the hash. SHA-256 is fine here (no need for slow argon2)
-// because the token is already long and random, unlike a human password.
-const hashResetToken = (token: string): string =>
-  createHash("sha256").update(token).digest("hex");
 
 // Build the link from OUR configured frontend URL.
 // NEVER build it from req.headers.host: an attacker can fake that header and
@@ -67,13 +59,13 @@ export const requestPasswordReset = async (
   // Older unused links stop working. Only the newest one is valid.
   await passwordResetRepository.invalidateAllForUser(user.id);
 
-  const token = generateResetToken();
+  const token = generateSecureToken();
   const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
 
   // Only the HASH goes to the database.
   await passwordResetRepository.createResetToken(
     user.id,
-    hashResetToken(token),
+    hashSecureToken(token),
     expiresAt
   );
 
@@ -96,7 +88,7 @@ export const resetPassword =async (
 ): Promise<void> => {
   // Check the token and burn it in one atomic step (see the repository).
   // Wrong, expired, and already-used tokens all give the same answer.
-  const userId = await passwordResetRepository.consumeToken(hashResetToken(token));
+  const userId = await passwordResetRepository.consumeToken(hashSecureToken(token));
 
   if (!userId) {
     throw new AppError("Invalid or expired reset link", 400, "INVALID_RESET_TOKEN");
