@@ -94,6 +94,33 @@ export const refreshRateLimit = rateLimit({
   handler: tooManyRequests("Too many refresh requests. Try again later."),
 });
 
+// ---------------------------------------------------------------------------
+// 5. FORGOT-PASSWORD limiter: stop email bombing
+// ---------------------------------------------------------------------------
+// Each request can send an email. Without a limit, a robot could flood
+// someone's inbox with reset emails (and run up your email bill).
+// 3 per hour per IP.
+export const forgotPasswordRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  limit: 3,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: tooManyRequests("Too many reset requests. Try again later."),
+});
+
+// ---------------------------------------------------------------------------
+// 6. RESET-PASSWORD limiter: stop token guessing
+// ---------------------------------------------------------------------------
+// The token is 64 random hex characters, so guessing is hopeless anyway.
+// This is a cheap extra layer. 10 per hour per IP.
+export const resetPasswordRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: tooManyRequests("Too many attempts. Try again later."),
+});
+
 /**
  * ============================================================================
  * THINGS TO REMEMBER (the "gotchas")
