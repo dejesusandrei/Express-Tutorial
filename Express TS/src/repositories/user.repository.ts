@@ -9,7 +9,7 @@ import { transaction } from "../utils/databaseTransaction";
 export const findAll = async (): Promise<User[]> => {
   const result = await query<User>(
     `
-      SELECT id, name, email, password_hash, role, created_at
+      SELECT id, name, email, role, created_at
       FROM users
       ORDER BY created_at DESC
     `
@@ -23,7 +23,7 @@ export const findById = async (
 ): Promise<User | undefined> => {
   const result = await query<User>(
     `
-      SELECT id, name, email, role, password_hash, created_at
+      SELECT id, name, email, role, created_at
       FROM users
       WHERE id = $1
     `,
@@ -38,7 +38,7 @@ export const findByEmail = async (
 ): Promise<User | undefined> =>{
   const result = await query<User>(
     `
-      SELECT id, name, email, role, password_hash, created_at, email_verified_at
+      SELECT id, name, email, role, password_hash, created_at, locked_until, email_verified_at
       FROM users
       WHERE LOWER(email) = LOWER($1)
     `,
@@ -75,7 +75,7 @@ export const deleteById = async (
     `
       DELETE FROM users
       WHERE id = $1
-      RETURNING *;
+      RETURNING id, name, email, role, created_at
     `,
     [id]
   );

@@ -6,171 +6,156 @@ import { AppError } from "../errors/AppError.js";
  * ============================================================================
  * RATE LIMITING: the "candy jar rule"
  * ============================================================================
+ * Each visitor (identified by IP address) may make only N requests in a time
+ * window. Over the limit, the guard says "come back later": 429.
  *
- * Imagine a candy jar with a sign: "Each kid may take 5 candies per hour."
- * The guard keeps a tally for every kid. When a kid reaches 5, the guard says
- * "Come back later" (HTTP 429 Too Many Requests).
- *
- * Our server does the same thing: it counts how many requests each visitor
- * (identified by IP address) made in a time window, and blocks them when they
- * go over the limit.
- *
- * WHAT ATTACKS THIS STOPS
- * -----------------------
- * - Brute force      : a robot tries 1,000,000 passwords on one account.
- * - Credential stuffing: a robot tries leaked email+password pairs from other
- *                        websites against your login.
- * - Spam sign-ups    : a robot creates thousands of fake accounts.
- * - Overload (basic DoS): one visitor floods the server with requests.
- *
- * Each route gets its own limit, because their risk is different:
- * login is dangerous, so it is strict; a normal page is harmless, so it is loose.
+ * What it stops: brute force, credential stuffing, fake-account spam, email
+ * bombing, and basic flooding. Each route gets its own limit, because the
+ * risk differs: login is dangerous (strict), a normal page is harmless (loose).
  * ============================================================================
  */
 
-// ---------------------------------------------------------------------------
-// Helper: what happens when someone goes over the limit
-// ---------------------------------------------------------------------------
-// Instead of sending a response ourselves, we pass an AppError to next().
-// Then your errorHandler formats it the SAME way as every other error, so the
-// frontend always sees the same JSON shape: { success: false, error: {...} }.
-//
-// The library already adds a "Retry-After" header automatically, which tells
-// the client how many seconds to wait.
+// What happens when someone goes over the limit: pass an AppError to next(),
+// so errorHandler formats it like every other error. The library adds the
+// Retry-After header (seconds to wait) by itself.
 const tooManyRequests = (message: string) =>
   (_req: Request, _res: Response, next: NextFunction) =>
     next(new AppError(message, 429, "TOO_MANY_REQUESTS"));
 
-// ---------------------------------------------------------------------------
-// 1. GLOBAL limiter: a loose rule for the whole API
-// ---------------------------------------------------------------------------
-// Catches robots that flood ANY endpoint. High number so normal users never
-// notice it: 300 requests per 15 minutes per IP.
-export const globalRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // the time window: 15 minutes (in milliseconds)
-  limit: 300, // max requests per IP inside that window
-  standardHeaders: "draft-8", // send RateLimit headers so clients can see their quota
-  legacyHeaders: false, // don't send the old X-RateLimit-* headers
-  handler: tooManyRequests("Too many requests. Please slow down."),
+/**
+ * TEST-ONLY RATE LIMIT BYPASS
+ *
+ * Kapag nag-i-integration test tayo, maaaring paulit-ulit tayong mag-login
+ * o mag-request sa API. Baka maabot agad ang rate limit kahit testing lang.
+ *
+ * Kaya may switch tayo para pansamantalang i-skip ang rate limiting.
+ *
+ * Pero dalawang conditions ang kailangang matupad:
+ * 1. NODE_ENV must be "test".
+ * 2. DISABLE_RATE_LIMIT must be "true".
+ *
+ * Kapag production environment, hindi gagana ang bypass na ito kahit
+ * aksidenteng naka-set sa "true" ang DISABLE_RATE_LIMIT.
+ *
+ * Ang DISABLE_RATE_LIMIT ay sine-set sa test/setup/env.ts.
+ */
+const skipInTests = (): boolean =>
+  process.env.NODE_ENV === "test" &&
+  process.env.DISABLE_RATE_LIMIT === "true";
+
+
+/**
+ * LIMITER FACTORY
+ *
+ * Sa halip na ulit-ulitin ang parehong rateLimit configuration sa bawat
+ * route, gumawa tayo ng reusable function na createLimiter().
+ *
+ * Dito natin ibibigay ang:
+ * - windowMs: gaano katagal ang counting period.
+ * - limit: ilang requests ang allowed sa period na iyon.
+ * - message: message kapag naabot ang limit.
+ * - skipSuccessfulRequests: kung true, hindi bibilangin ang successful
+ *   requests; kapag false, kasama ang successful requests sa count.
+ *
+ * Ang ?? false ay nangangahulugang kapag hindi natin binigyan ng value
+ * ang skipSuccessfulRequests, automatic na false ang gagamitin.
+ */
+const createLimiter = (options: {
+  windowMs: number; // Tagal ng time window, naka-milliseconds.
+  limit: number; // Maximum number of requests per IP.
+  message: string; // Error message kapag lumampas sa limit.
+  skipSuccessfulRequests?: boolean; // I-skip ba sa count ang successful requests?
+}) => rateLimit({
+  windowMs: options.windowMs,
+  limit: options.limit,
+  skipSuccessfulRequests: options.skipSuccessfulRequests ?? false,
+  standardHeaders: "draft-8", // Modern RateLimit headers para makita ang remaining quota.
+  legacyHeaders: false, // Huwag nang mag-send ng old X-RateLimit headers.
+  skip: skipInTests, // I-skip ang limiter kapag test environment at enabled ang bypass.
+  handler: tooManyRequests(options.message), // Custom handler kapag lumampas sa limit.
 });
 
-// ---------------------------------------------------------------------------
-// 2. LOGIN limiter: the strictest rule (brute force target #1)
-// ---------------------------------------------------------------------------
-// 5 FAILED attempts per 15 minutes per IP.
-// skipSuccessfulRequests: a correct login does NOT use up the counter, so a
-// real user who logs in normally never gets blocked. Only wrong passwords count.
-export const loginRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000,
+const MINUTES = 60 * 1000;
+const HOURS = 60 * MINUTES;
+
+// 1. GLOBAL: a loose net for the whole API (300 per 15 minutes)
+export const globalRateLimit = createLimiter({
+  windowMs: 15 * MINUTES,
+  limit: 300,
+  message: "Too many requests. Please slow down.",
+});
+
+// 2. LOGIN: the strictest. 5 FAILED attempts per 15 minutes.
+// skipSuccessfulRequests: a correct login doesn't use up the counter, so a
+// real user who logs in normally is never blocked.
+export const loginRateLimit = createLimiter({
+  windowMs: 15 * MINUTES,
   limit: 5,
   skipSuccessfulRequests: true,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  handler: tooManyRequests("Too many login attempts. Try again in 15 minutes."),
+  message: "Too many login attempts. Try again in 15 minutes.",
 });
 
-// ---------------------------------------------------------------------------
-// 3. REGISTER limiter: stop fake-account spam
-// ---------------------------------------------------------------------------
-// 5 sign-ups per hour per IP. A real person rarely creates more than one.
-export const registerRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
+// 3. REGISTER: stop fake-account spam. 5 sign-ups per hour.
+export const registerRateLimit = createLimiter({
+  windowMs: 1 * HOURS,
   limit: 5,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  handler: tooManyRequests("Too many accounts created. Try again later."),
+  message: "Too many accounts created. Try again later.",
 });
 
-// ---------------------------------------------------------------------------
-// 4. REFRESH limiter: a medium rule
-// ---------------------------------------------------------------------------
-// A real app calls /refresh only when the access token expires (every ~15 min),
-// so 30 per 15 minutes is generous for humans but stops hammering.
-export const refreshRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000,
+// 4. REFRESH: humans call it about every 15 minutes, so 30 per 15 minutes is
+// generous for them but stops hammering.
+export const refreshRateLimit = createLimiter({
+  windowMs: 15 * MINUTES,
   limit: 30,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  handler: tooManyRequests("Too many refresh requests. Try again later."),
+  message: "Too many refresh requests. Try again later.",
 });
 
-// ---------------------------------------------------------------------------
-// 5. FORGOT-PASSWORD limiter: stop email bombing
-// ---------------------------------------------------------------------------
-// Each request can send an email. Without a limit, a robot could flood
-// someone's inbox with reset emails (and run up your email bill).
-// 3 per hour per IP.
-export const forgotPasswordRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
+// 5. FORGOT-PASSWORD: every request can send an email, so this stops email
+// bombing (flooding someone's inbox). 3 per hour.
+export const forgotPasswordRateLimit = createLimiter({
+  windowMs: 1 * HOURS,
   limit: 3,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  handler: tooManyRequests("Too many reset requests. Try again later."),
+  message: "Too many reset requests. Try again later.",
 });
 
-// ---------------------------------------------------------------------------
-// 6. RESET-PASSWORD limiter: stop token guessing
-// ---------------------------------------------------------------------------
-// The token is 64 random hex characters, so guessing is hopeless anyway.
-// This is a cheap extra layer. 10 per hour per IP.
-export const resetPasswordRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000,
+// 6. RESET-PASSWORD: the token is 64 random hex characters, so guessing is
+// hopeless anyway. A cheap extra layer. 10 per hour.
+export const resetPasswordRateLimit = createLimiter({
+  windowMs: 1 * HOURS,
   limit: 10,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  handler: tooManyRequests("Too many attempts. Try again later."),
+  message: "Too many attempts. Try again later.",
 });
 
-// ---------------------------------------------------------------------------
-// 7. RESEND-VERIFICATION limiter: stop email bombing
-// ---------------------------------------------------------------------------
-// Every request can send an email to someone. 3 per hour per IP.
-export const resendVerificationRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000,
+// 7. RESEND-VERIFICATION: stops email bombing. 3 per hour.
+export const resendVerificationRateLimit = createLimiter({
+  windowMs: 1 * HOURS,
   limit: 3,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  handler: tooManyRequests("Too many requests. Try again later."),
+  message: "Too many requests. Try again later.",
 });
 
-// ---------------------------------------------------------------------------
-// 8. VERIFY-EMAIL limiter: a cheap extra layer against token guessing
-// ---------------------------------------------------------------------------
-export const verifyEmailRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000,
+// 8. VERIFY-EMAIL: a cheap extra layer against token guessing. 10 per hour.
+export const verifyEmailRateLimit = createLimiter({
+  windowMs: 1 * HOURS,
   limit: 10,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  handler: tooManyRequests("Too many attempts. Try again later."),
+  message: "Too many attempts. Try again later.",
 });
 
 /**
  * ============================================================================
- * THINGS TO REMEMBER (the "gotchas")
+ * THINGS TO REMEMBER
  * ============================================================================
+ * 1. WHO IS "THE VISITOR"? By default req.ip. Behind a proxy (Render, Railway,
+ *    Nginx, Cloudflare) every request looks like it comes from the PROXY, so
+ *    everybody would share one counter. When deployed behind exactly one
+ *    proxy, set in app.ts:  app.set("trust proxy", 1);
+ *    Never set it to true blindly: an attacker could fake X-Forwarded-For and
+ *    get a fresh counter on every request.
  *
- * 1. WHO IS "THE VISITOR"? By default it is req.ip.
- *    Behind a proxy (Render, Railway, Nginx, Cloudflare), every request looks
- *    like it comes from the PROXY's IP, so ALL users would share one counter!
- *    Fix, in app.ts, when deployed behind exactly one proxy:
- *        app.set("trust proxy", 1);
- *    Do NOT set it to true blindly: then an attacker can fake the
- *    X-Forwarded-For header and get a fresh counter on every request.
+ * 2. MEMORY STORE: counters live in the server's memory. A restart resets
+ *    them, and two server copies each keep their own. In production use a
+ *    shared store such as Redis (rate-limit-redis).
  *
- * 2. MEMORY STORE: counters live in the server's memory by default.
- *    - Restarting the server resets everyone's counter.
- *    - With 2+ server copies, each has its own counter (attacker gets 2x).
- *    In production use a shared store such as Redis (rate-limit-redis).
- *
- * 3. IP-only limits are not perfect: attackers rotate IPs, and many real users
- *    can share one IP (a school or office). That is why we also add
- *    per-account protection in the next lesson (account lockout).
- *
- * WHERE TO USE (examples)
- * -----------------------
- *   app.ts          : app.use(globalRateLimit);       // before the routes
- *   auth.route.ts   : router.post("/register", registerRateLimit, ...);
- *                     router.post("/login",    loginRateLimit, ...);
- *                     router.post("/refresh",  refreshRateLimit, ...);
+ * 3. IP limits aren't perfect: attackers rotate IPs, and many real users can
+ *    share one IP. That's why login ALSO has per-account lockout.
  * ============================================================================
  */

@@ -7,5 +7,9 @@ export default defineConfig({
     // Which files are tests: anything ending in .test.ts inside /tests
     include: ["tests/**/*.test.ts"],
     environment: "node",
+    setupFiles: ["tests/setup/env.ts"],
+    fileParallelism: false,
+    testTimeout: 20000,
+    hookTimeout: 20000,
   },
 });

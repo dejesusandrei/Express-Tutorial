@@ -204,12 +204,10 @@ export const refresh = async (
 export const logout = async (
   token: string | undefined
 ): Promise<void> => {
-  console.log("[DEV] logout: cookie token received?", !!token);
   if (!token) return;
 
   const tokenHash = hashRefreshToken(token);
   const session = await refreshTokenRepository.findActiveByTokenHash(tokenHash);
-    console.log("[DEV] logout: session to revoke:", session?.id ?? "NONE"); 
 
   if (session) {
     await refreshTokenRepository.revokeById(session.id);

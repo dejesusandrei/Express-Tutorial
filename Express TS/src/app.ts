@@ -1,0 +1,72 @@
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import { env } from "./config/env.js";
+import cookieParser from "cookie-parser";
+
+
+// Global Middleware
+import requestLogger from "./middleware/requestLogger.js";
+import { globalRateLimit } from "./middleware/rateLimit.js";
+
+// Routers
+import userRouter from "./routers/user.route.js";
+import taskRoute from "./routers/task.route.js";
+import authRouter from "./routers/auth.route.js";
+
+// Error Middleware
+import notFound from "./middleware/notFound.js";
+import { errorHandler } from "./middleware/errorHandler.js";
+import { verifyOrigin } from "./middleware/verifyOrigin.js";
+
+const app = express();
+
+
+// =========================
+// Global Middleware
+// =========================
+app.use(helmet());
+app.use(cors({
+    origin: env.frontendUrl,
+    credentials: true
+  })
+);
+app.use(globalRateLimit); // apply rate limiting to all requests
+app.use(express.json());
+app.use(cookieParser());
+app.use(requestLogger);
+
+
+// =========================
+// Routes
+// =========================
+
+app.use("/api/auth", verifyOrigin, authRouter);
+app.use("/api/users", userRouter);
+app.use("/api/tasks", taskRoute);
+
+app.get("/", (req, res) => {
+  res.status(200).json({
+    msg: "Hello Express!",
+  });
+});
+
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+  });
+});
+
+// =========================
+// Error Handling
+// =========================
+
+// 404 handler
+// Runs when no route above matches the request.
+app.use(notFound);
+
+// Global error handler
+// Handles errors thrown from controllers, services, etc.
+app.use(errorHandler);
+
+export default app;
