@@ -6,6 +6,7 @@ import type { LoginInput } from "../schema/auth.schema.js";
 import type { LoginResult } from "../types/Login.js";
 
 import { generateAccessToken } from "../utils/jwt.js";
+import { logger } from "../utils/logger.js";
 import { generateRefreshToken, hashRefreshToken } from "../utils/refreshToken.js";
 
 import * as userRepository from "../repositories/user.repository.js";
@@ -70,7 +71,7 @@ export const register = async (
   await emailVerificationService
     .sendVerificationEmailFor(user)
     .catch((error: Error) => {
-      console.error("Could not start email verification:", error.message);
+      logger.error({ err: error }, "Could not start email verification");
     });
 
   return user;
@@ -98,12 +99,14 @@ export const login = async (
   // attack). So we burn the same time on a fake hash.
   if (!user) {
     await argon2.verify(await getDummyHash(), password);
+    logger.warn({ event: "auth.login_failed", reason: "unknown_user" }, "Login failed");
     throw invalidCredentials();
   }
 
   // Case 2: account is locked. Same time-burning, same generic error.
   if (user.locked_until && user.locked_until > new Date()) {
     await argon2.verify(await getDummyHash(), password);
+    logger.warn({ event: "auth.login_blocked", reason: "locked", userId: user.id }, "Login blocked");
     throw invalidCredentials();
   }
 
@@ -117,6 +120,7 @@ export const login = async (
       MAX_FAILED_LOGINS,
       LOCK_MINUTES
     );
+    logger.warn({ event: "auth.login_failed", reason: "bad_password", userId: user.id }, "Login failed");
     throw invalidCredentials();
   }
   // Case 4: success. Clear the counter so old mistakes don't pile up.
@@ -127,6 +131,7 @@ export const login = async (
   // knows the correct password learns the account exists and is unverified,
   // so strangers can't use this error to discover registered emails.
   if (!user.email_verified_at) {
+    logger.info({ event: "auth.login_unverified", userId: user.id }, "Login before verification");
     throw new AppError("Please verify your email before logging in", 403, "EMAIL_NOT_VERIFIED");
   }
 
@@ -144,6 +149,8 @@ export const login = async (
   // The access token is tied to this session. When the session is revoked
   // (logout), the access token stops working immediately.
   const accessToken = generateAccessToken(user.id, session.id);
+
+  logger.info({ event: "auth.login_succeeded", userId: user.id }, "Login succeeded");
 
   return { user, accessToken, refreshToken };
 };
@@ -183,7 +190,7 @@ export const refresh = async (
       // which side is the attacker, so kill EVERY session of this user and
       // force a fresh login on all devices.
       await refreshTokenRepository.revokeAllForUser(existing.user_id);
-
+      logger.warn({ event: "auth.refresh_reuse_detected", userId: existing.user_id }, "Refresh token reuse detected");
       throw new AppError("Refresh token reuse detected. Please log in again.", 401, "REFRESH_TOKEN_REUSED");
     }
     throw new AppError("Invalid or expired refresh token", 401, "INVALID_REFRESH_TOKEN");

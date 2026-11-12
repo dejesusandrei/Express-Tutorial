@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 
 import { verifyAccessToken } from "../utils/jwt.js";
+import { setRequestUserId } from "../utils/requestContext.js";
 import * as refreshTokenRepository from "../repositories/refreshToken.repository.js";
 import { AppError } from "../errors/AppError.js";
 
@@ -33,7 +34,6 @@ export const authMiddleware = async (
   next: NextFunction
 ) => {
   try {
-    console.log("[DEV] 1. middleware running");   
     // STEP 1: Is there an Authorization header?
     const authHeader = req.headers.authorization;
 
@@ -52,20 +52,19 @@ export const authMiddleware = async (
     // STEP 3: Check the token.
     // Throws 401 TOKEN_EXPIRED or 401 INVALID_TOKEN by itself.
     const { userId, sessionId } = verifyAccessToken(parts[1]);
-    console.log("[DEV] 2. sessionId from token:", sessionId);  
 
     // STEP 4: Is the session behind this token still alive?
     // After logout (or reuse detection), the session is revoked, so the token
     // stops working right away instead of living on for up to 15 minutes.
     const sessionActive = await refreshTokenRepository.isSessionActive(sessionId);
-    console.log("[DEV] 3. session active?", sessionActive);
-
+    
     if (!sessionActive) {
       throw new AppError("Session has ended. Please log in again.", 401, "SESSION_ENDED");
     }
 
-    // STEP 5: Remember who is calling. Controllers must use THIS id for
-    // "my own data", never an id typed by the user in req.body or req.params.
+    // STEP 5: Remember who is calling.
+    // setRequestUserId: para ang mga log line ng request na ito ay may userId na rin.
+    setRequestUserId(userId);
     req.user = { userId };
 
     next();
