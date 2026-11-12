@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 // jwt.ts reads env.jwtSecret. We REPLACE the real env module with a fake one,
 // so the test doesn't need a .env file and always uses the same secret.
 // (vi.mock is moved to the top of the file automatically.)
-vi.mock("../../src/config/env.js", () => ({
+vi.mock("../../src/config/env.config.js", () => ({
   env: { jwtSecret: "a".repeat(64) },
 }));
 

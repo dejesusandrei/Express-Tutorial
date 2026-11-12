@@ -6,7 +6,7 @@ import type { ApiResult } from "../types/Api.js";
 
 // services
 import * as authService from "../services/auth.service.js";
-import { env } from "../config/env.js";
+import { env } from "../config/env.config.js";
 import { AppError } from "../errors/AppError.js";
 
 export const register = async (

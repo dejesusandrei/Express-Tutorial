@@ -1,7 +1,7 @@
 import argon2 from "argon2";
 import { createHash, randomBytes } from "node:crypto";
 
-import { env } from "../config/env.js";
+import { env } from "../config/env.config.js";
 import { AppError } from "../errors/AppError.js";
 
 import {generateSecureToken, hashSecureToken } from '../utils/secureToken.js';
