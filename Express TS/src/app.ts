@@ -22,15 +22,23 @@ import { verifyOrigin } from "./middleware/verifyOrigin.js";
 
 const app = express();
 
+// Tinatanggal ang "X-Powered-By: Express" header para hindi agad makita ng visitors na Express ang backend natin.
+app.disable("x-powered-by");
+
+// Ilang proxy ang nasa harap ng app natin.
+// 0 kapag local, usually 1 kapag deployed.
+// Para makuha ang totoong IP ng user sa logs at rate limiter.
+app.set("trust proxy", env.trustProxy);
 
 // =========================
 // Global Middleware
 // =========================
 app.use(requestLogger);
 app.use(helmet());
-app.use(cors({
-    origin: env.frontendUrl,
-    credentials: true
+app.use(cors
+  ({
+    origin: new URL(env.frontendUrl).origin,
+    credentials: true,
   })
 );
 app.use(globalRateLimit); // apply rate limiting to all requests
