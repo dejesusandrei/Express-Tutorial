@@ -203,3 +203,15 @@ describe("DELETE /api/users/:id", () => {
     expect(rows).toHaveLength(1);
   });
 });
+
+
+describe("malformed input", () => {
+  // Postgres rejects a bad UUID with error 22P02. handleDatabaseError turns it
+  // into a 400. Without that, this request would be a 500 and a stack trace
+  // in the logs, which is the wrong answer for something the CLIENT got wrong.
+  it("GET /api/users/not-a-uuid is a 400, not a 500", async () => {
+    const res = await getAs("/api/users/not-a-uuid", await loginAs(ADMIN_EMAIL));
+
+    expect(res.status).toBe(400);
+  });
+});
