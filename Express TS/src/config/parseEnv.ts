@@ -60,6 +60,11 @@ const envSchema = z
 
     LOG_LEVEL: z.enum(LOG_LEVELS).optional(),
 
+    // Show the interactive API docs at /api/docs? If not set: ON in
+    // development and test, OFF in production. Set "true" in production only
+    // on a private staging server.
+    API_DOCS_ENABLED: z.enum(["true", "false"]).optional(),
+
     // How many reverse proxies sit in front of the app (0 = none).
     // Render, Railway, and Nginx setups are usually 1.
     TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
@@ -78,9 +83,7 @@ const envSchema = z
     }
   });
 
-export const parseEnv = (
-  raw: Record<string, string | undefined>
-) => {
+export const parseEnv = (raw: Record<string, string | undefined>) => {
   // "PORT=" (empty) in a .env file means "not set", not "set to nothing".
   // Without this, Number("") is 0, so PORT= would silently become port 0.
   const cleaned = Object.fromEntries(
@@ -104,9 +107,8 @@ export const parseEnv = (
 
   const value = result.data;
 
-  // Friendly names, frozen so nothing can change them while the app runs.
-  // The shape (env.port, env.db.host...) is the same one the rest of the
-  // project already uses.
+  // Freezes the env object so its values cannot be accidentally changed.
+
   return Object.freeze({
     nodeEnv: value.NODE_ENV,
     isProduction: value.NODE_ENV === "production",
@@ -116,6 +118,12 @@ export const parseEnv = (
     jwtSecret: value.JWT_SECRET,
     logLevel: value.LOG_LEVEL,
     trustProxy: value.TRUST_PROXY,
+
+    // An explicit value always wins. Otherwise: docs on, except in production.
+    docsEnabled:
+      value.API_DOCS_ENABLED !== undefined
+        ? value.API_DOCS_ENABLED === "true"
+        : value.NODE_ENV !== "production",
 
     db: Object.freeze({
       host: value.DB_HOST,

@@ -14,6 +14,7 @@ import userRouter from "./routers/user.route.js";
 import taskRoute from "./routers/task.route.js";
 import authRouter from "./routers/auth.route.js";
 import healthRouter from "./routers/health.route.js";
+import docsRouter from "./routers/docs.route.js";
 
 // Error Middleware
 import notFound from "./middleware/notFound.js";
@@ -34,6 +35,15 @@ app.set("trust proxy", env.trustProxy);
 // Global Middleware
 // =========================
 app.use(requestLogger);
+
+// Docs only when enabled (off by default in production). They get their OWN
+// helmet without the Content-Security-Policy, because Swagger UI needs a
+// looser one. It is mounted before the global helmet, so the strict policy
+// stays on every other route.
+if (env.docsEnabled) {
+  app.use("/api/docs", helmet({ contentSecurityPolicy: false }), docsRouter);
+}
+
 app.use(helmet());
 app.use(cors
   ({

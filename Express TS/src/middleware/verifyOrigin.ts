@@ -38,7 +38,11 @@ const toOrigin = (
 
 // Allowed origins. To allow more (e.g. an admin site), add them to this array.
 const allowedOrigins = new Set(
-  [env.frontendUrl]
+  [
+    env.frontendUrl,
+    // Development only: let the docs page (served by this API) try the endpoints.
+    ...(env.isProduction ? [] : [`http://localhost:${env.port}`]),
+  ]
     .map(toOrigin)
     .filter((origin): origin is string => origin !== null)
 );

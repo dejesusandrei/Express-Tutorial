@@ -14,9 +14,7 @@ import { parseEnv } from "../../src/config/parseEnv.js";
 const SECRET = "x7Kp2mQ9vL4nR8sT1wY6zB3cD5fG0hJa"; // 32 characters, random-looking
 
 // A fully valid environment. Each test changes only what it cares about.
-const validEnv = (
-  overrides: Record<string, string | undefined> = {}
-) => ({
+const validEnv = (overrides: Record<string, string | undefined> = {}) => ({
   NODE_ENV: "development",
   PORT: "3000",
   FRONTEND_URL: "http://localhost:5173",
@@ -30,9 +28,7 @@ const validEnv = (
 });
 
 // Runs parseEnv and returns the error message ("" if it did not throw).
-const errorOf = (
-  raw: Record<string, string | undefined>
-): string => {
+const errorOf = (raw: Record<string, string | undefined>): string => {
   try {
     parseEnv(raw);
     return "";
@@ -187,5 +183,43 @@ describe("parseEnv: reports ALL problems at once", () => {
     expect(message).toContain("JWT_SECRET");
     expect(message).toContain("FRONTEND_URL");
     expect(message).toContain("DB_NAME");
+  });
+});
+
+describe("parseEnv: API docs switch", () => {
+  it("docs are ON by default in development", () => {
+    expect(parseEnv(validEnv({ NODE_ENV: "development" })).docsEnabled).toBe(true);
+  });
+
+  it("docs are OFF by default in production (don't publish a map of the API)", () => {
+    const env = parseEnv(
+      validEnv({ NODE_ENV: "production", FRONTEND_URL: "https://myapp.com" })
+    );
+
+    expect(env.docsEnabled).toBe(false);
+  });
+
+  it("an explicit API_DOCS_ENABLED=true wins, even in production", () => {
+    const env = parseEnv(
+      validEnv({
+        NODE_ENV: "production",
+        FRONTEND_URL: "https://myapp.com",
+        API_DOCS_ENABLED: "true",
+      })
+    );
+
+    expect(env.docsEnabled).toBe(true);
+  });
+
+  it("an explicit API_DOCS_ENABLED=false turns docs off in development", () => {
+    expect(
+      parseEnv(validEnv({ API_DOCS_ENABLED: "false" })).docsEnabled
+    ).toBe(false);
+  });
+
+  it("rejects an API_DOCS_ENABLED that is not true or false", () => {
+    expect(errorOf(validEnv({ API_DOCS_ENABLED: "yes" }))).toContain(
+      "API_DOCS_ENABLED"
+    );
   });
 });
