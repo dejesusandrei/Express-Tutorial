@@ -123,6 +123,26 @@ export const get = (path: string) => request(app).get(path);
 export const getAs = (path: string, accessToken: string) =>
   request(app).get(path).set("Authorization", `Bearer ${accessToken}`);
 
+// ---------------------------------------------------------------------------
+// Helpers for calls made as a logged-in user (Bearer token)
+// ---------------------------------------------------------------------------
+export const postAs = (path: string, accessToken: string) =>
+  request(app)
+    .post(path)
+    .set("Origin", FRONTEND_ORIGIN)
+    .set("Authorization", `Bearer ${accessToken}`);
+
+export const putAs = (path: string, accessToken: string) =>
+  request(app)
+    .put(path)
+    .set("Origin", FRONTEND_ORIGIN)
+    .set("Authorization", `Bearer ${accessToken}`);
+
+export const deleteAs = (path: string, accessToken: string) =>
+  request(app)
+    .delete(path)
+    .set("Origin", FRONTEND_ORIGIN)
+    .set("Authorization", `Bearer ${accessToken}`);
 
 /**
  * REGISTER USER HELPER

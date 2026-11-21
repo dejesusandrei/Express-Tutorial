@@ -41,7 +41,7 @@ describe("indexes for the hot queries", () => {
     expect(hasIndex("refresh_sessions", /\(user_id\)/)).toBe(true);
   });
 
-  it("tasks.owner_id (list MY tasks)", () => {
+  it("tasks.owner_id (list MY tasks, paginated)", () => {
     // [,)] also accepts a composite index that starts with owner_id.
     expect(hasIndex("tasks", /\(owner_id[,)]/)).toBe(true);
   });

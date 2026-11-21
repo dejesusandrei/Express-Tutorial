@@ -162,6 +162,7 @@ export const openApiSpec = {
   tags: [
     { name: "Auth", description: "Register, log in, tokens, passwords, email verification" },
     { name: "Users", description: "User accounts" },
+    { name: "Tasks", description: "My tasks. You only ever see and change your OWN tasks." },
     { name: "Health", description: "Liveness and readiness checks" },
   ],
 
@@ -378,6 +379,109 @@ export const openApiSpec = {
       }),
     },
 
+    // ----------------------------------------------------------------- TASKS
+    "/api/tasks": {
+      get: {
+        ...operation({
+          tag: "Tasks",
+          id: "listMyTasks",
+          summary: "My tasks, newest first (paginated)",
+          description:
+            "Returns only YOUR tasks. `pagination` sits next to `data`, not inside it. " +
+            "The server enforces a maximum `limit`.",
+          security: "bearer",
+          responses: {
+            "200": {
+              description: "One page of my tasks",
+              content: json({
+                type: "object",
+                required: ["success", "data", "pagination"],
+                properties: {
+                  success: { type: "boolean", enum: [true] },
+                  data: {
+                    type: "object",
+                    required: ["tasks"],
+                    properties: { tasks: { type: "array", items: ref("Task") } },
+                  },
+                  pagination: ref("Pagination"),
+                },
+              }),
+            },
+            ...errors("400", "401", "429"),
+          },
+        }),
+        parameters: [
+          {
+            name: "page",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, default: 1 },
+          },
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            description: "Items per page. The server enforces a maximum.",
+            schema: { type: "integer", minimum: 1 },
+          },
+        ],
+      },
+
+      post: operation({
+        tag: "Tasks",
+        id: "createTask",
+        summary: "Create a task",
+        description: "The owner is always the logged-in user. An `owner_id` in the body is ignored.",
+        body: "TaskCreateRequest",
+        security: "bearer",
+        responses: {
+          "201": ok("Task created", { type: "object", properties: { task: ref("Task") } }),
+          ...errors("400", "401", "413", "429"),
+        },
+      }),
+    },
+
+    "/api/tasks/{id}": {
+      parameters: [idParameter],
+
+      get: operation({
+        tag: "Tasks",
+        id: "getTaskById",
+        summary: "One of my tasks",
+        description: "A task that belongs to someone else answers 404, as if it did not exist.",
+        security: "bearer",
+        responses: {
+          "200": ok("The task", { type: "object", properties: { task: ref("Task") } }),
+          ...errors("400", "401", "404", "429"),
+        },
+      }),
+
+      put: operation({
+        tag: "Tasks",
+        id: "updateTask",
+        summary: "Replace one of my tasks",
+        description: "Both `title` and `completed` are required. A task of someone else answers 404.",
+        body: "TaskUpdateRequest",
+        security: "bearer",
+        responses: {
+          "200": ok("The updated task", { type: "object", properties: { task: ref("Task") } }),
+          ...errors("400", "401", "404", "413", "429"),
+        },
+      }),
+
+      delete: operation({
+        tag: "Tasks",
+        id: "deleteTask",
+        summary: "Delete one of my tasks",
+        description: "Returns the deleted task. A task of someone else answers 404.",
+        security: "bearer",
+        responses: {
+          "200": ok("The deleted task", { type: "object", properties: { task: ref("Task") } }),
+          ...errors("400", "401", "404", "429"),
+        },
+      }),
+    },
+
     // ---------------------------------------------------------------- HEALTH
     "/api/health": {
       get: operation({
@@ -483,6 +587,48 @@ export const openApiSpec = {
           role: { type: "string", enum: ["user", "admin"] },
           created_at: { type: "string", format: "date-time" },
           email_verified_at: { type: "string", format: "date-time", nullable: true },
+        },
+      },
+
+      Task: {
+        type: "object",
+        required: ["id", "owner_id", "title", "completed", "created_at"],
+        properties: {
+          id: { type: "string", format: "uuid" },
+          owner_id: { type: "string", format: "uuid" },
+          title: { type: "string" },
+          completed: { type: "boolean" },
+          created_at: { type: "string", format: "date-time" },
+        },
+      },
+
+      Pagination: {
+        type: "object",
+        required: ["currentPage", "limit", "totalItems", "totalPages"],
+        properties: {
+          currentPage: { type: "integer", example: 1 },
+          limit: { type: "integer", example: 10 },
+          totalItems: { type: "integer", example: 23 },
+          totalPages: { type: "integer", example: 3 },
+        },
+      },
+
+      // Title limits must match TITLE_MIN / TITLE_MAX in schema/task.schema.ts.
+      TaskCreateRequest: {
+        type: "object",
+        required: ["title"],
+        properties: {
+          title: { type: "string", minLength: 2, maxLength: 100, example: "Buy rice" },
+          completed: { type: "boolean", default: false },
+        },
+      },
+
+      TaskUpdateRequest: {
+        type: "object",
+        required: ["title", "completed"],
+        properties: {
+          title: { type: "string", minLength: 2, maxLength: 100, example: "Buy rice and eggs" },
+          completed: { type: "boolean" },
         },
       },
 

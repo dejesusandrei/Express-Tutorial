@@ -70,21 +70,21 @@ describe("every endpoint is documented properly", () => {
   });
 
   it("documents 401 for every endpoint that needs a Bearer token", () => {
-  // Cookie endpoints are different: /logout never returns 401 on purpose
-  // (it is idempotent), and /refresh documents its own 401 codes.
-  for (const { method, path, operation } of operations()) {
-    const usesBearer = JSON.stringify(operation.security ?? []).includes(
-      "bearerAuth"
-    );
+    // Cookie endpoints are different: /logout never returns 401 on purpose
+    // (it is idempotent), and /refresh documents its own 401 codes.
+    for (const { method, path, operation } of operations()) {
+      const usesBearer = JSON.stringify(operation.security ?? []).includes(
+        "bearerAuth"
+      );
 
-    if (usesBearer) {
-      expect(
-        Object.keys(operation.responses ?? {}),
-        `${method} ${path}`
-      ).toContain("401");
+      if (usesBearer) {
+        expect(
+          Object.keys(operation.responses ?? {}),
+          `${method} ${path}`
+        ).toContain("401");
+      }
     }
-  }
-});
+  });
 
   it("documents 429 for every /api/auth endpoint (they are rate limited)", () => {
     for (const { method, path, operation } of operations()) {
@@ -113,6 +113,11 @@ describe("every endpoint is documented properly", () => {
       "get /api/users",
       "get /api/users/{id}",
       "delete /api/users/{id}",
+      "get /api/tasks",
+      "post /api/tasks",
+      "get /api/tasks/{id}",
+      "put /api/tasks/{id}",
+      "delete /api/tasks/{id}",
       "get /api/health",
       "get /api/health/ready",
     ];
