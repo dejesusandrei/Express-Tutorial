@@ -1,26 +1,33 @@
+
 import { z } from "zod";
 
 /**
  * ============================================================================
- * parseEnv: the "ingredient checklist" before the kitchen opens
+ * parseEnv: parang checklist ng ingredients bago magbukas ang kitchen
  * ============================================================================
- * A good cook checks the ingredients BEFORE turning on the stove. If the eggs
- * are missing, stop right away instead of discovering it halfway.
+ * Bago magluto, chine-check muna kung kumpleto ang ingredients.
+ * Kapag may kulang, dapat malaman agad bago magsimula.
  *
- * Same here. parseEnv checks every setting once, at startup:
- *   - missing or wrong -> the server REFUSES TO START and lists every problem
- *   - fine             -> you get a typed, frozen settings object
+ * Ganito rin ang ginagawa ng parseEnv. Chine-check nito ang lahat ng
+ * environment settings isang beses sa startup:
+ *   - May kulang o maling value -> hindi mag-start ang server at ililista
+ *     lahat ng problems.
+ *   - Lahat ay valid -> magbibigay ng typed at frozen settings object.
  *
- * It is a pure function: it only reads what you hand it and it THROWS on
- * failure (it does not call process.exit). That makes it easy to unit test.
- * src/config/env.ts is the only caller that uses process.env.
+ * Pure function ito: ang binabasa lang nito ay ang values na ipinasa sa kanya.
+ * Kapag may mali, nagti-throw ito ng error pero hindi tumatawag ng process.exit.
+ * Kaya madali rin itong i-test gamit ang unit tests.
+ *
+ * Ang src/config/env.ts lang ang dapat direktang gumamit ng process.env.
  * ============================================================================
  */
 
-// Secrets that start like these were copied from an example and never replaced.
+// Mga secret na nagsisimula sa mga value na ito ay malamang placeholder pa
+// at hindi pa napapalitan ng totoong random secret.
 const PLACEHOLDER_SECRET =
   /^(change[-_ ]?me|secret|password|your[-_ ]?secret|replace[-_ ]?me|example|test[-_ ]?secret)/i;
 
+// Mga valid na log levels na puwedeng gamitin sa Pino logger.
 const LOG_LEVELS = [
   "fatal",
   "error",
@@ -35,22 +42,33 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
-    // .env values are always TEXT ("3000"). coerce turns them into numbers.
-    // int + min/max: without the range, PORT=0 or PORT=99999 would be accepted.
+    // Text ang values sa .env (halimbawa, "3000").
+    // Ginagawang number ng coerce para magamit bilang port.
+    // Ang int at min/max ay para siguraduhing valid ang port number.
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
 
-    // The ONE website allowed to call this API (CORS + CSRF origin check).
+    // URL ng frontend na pinapayagang tumawag sa API.
+    // Ginagamit din ito sa CORS at CSRF Origin checking.
     FRONTEND_URL: z.string().url("must be a valid URL"),
 
     // ---- DATABASE ------------------------------------------------------
+
+    // Database connection settings.
+    // Kapag walang DB_HOST o DB_PORT, gagamitin ang default values.
     DB_HOST: z.string().min(1).default("localhost"),
     DB_PORT: z.coerce.number().int().min(1).max(65535).default(5432),
     DB_NAME: z.string().min(1),
     DB_USER: z.string().min(1),
     DB_PASSWORD: z.string().min(1),
 
-    // ---- SECRETS: no default on purpose ---------------------------------
-    // A default would let the app start with a known, public secret.
+    // Kung gagamit ng SSL/TLS encryption sa connection papuntang PostgreSQL.
+    // Usually, kailangan ito kapag kumokonekta sa hosted database gamit ang public network.
+    DB_SSL: z.enum(["true", "false"]).default("false"),
+
+    // ---- SECRETS: walang default value para dito -----------------------
+
+    // Walang default ang JWT_SECRET para hindi aksidenteng gumamit
+    // ang app ng publicly known secret.
     JWT_SECRET: z
       .string()
       .min(32, "must be at least 32 characters")
@@ -58,19 +76,32 @@ const envSchema = z
         message: "looks like a placeholder. Generate a random one",
       }),
 
+    // Optional na log level. Kapag walang value, gagamitin ng logger
+    // ang sarili nitong default setting.
     LOG_LEVEL: z.enum(LOG_LEVELS).optional(),
 
-    // Show the interactive API docs at /api/docs? If not set: ON in
-    // development and test, OFF in production. Set "true" in production only
-    // on a private staging server.
+    // Kung ipapakita ang interactive API documentation sa /api/docs.
+    // Kapag hindi ito naka-set, naka-enable sa development at test,
+    // pero naka-disable sa production.
     API_DOCS_ENABLED: z.enum(["true", "false"]).optional(),
 
-    // How many reverse proxies sit in front of the app (0 = none).
-    // Render, Railway, and Nginx setups are usually 1.
+    // Ilang reverse proxies ang nasa harap ng Express app.
+    // 0 = walang trusted proxy.
+    // Usually 1 kapag naka-host sa Render, Railway, o nasa likod ng Nginx.
     TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
+
+    // SameSite setting ng refresh-token cookie.
+    // lax    : Para sa frontend at API na nasa same site.
+    // strict : Mas mahigpit na cookie policy; same-site requests lang.
+    // none   : Para sa cross-site requests, tulad ng Vercel frontend at Render API.
+    //          Kailangan nitong naka-Secure ang cookie at naka-HTTPS.
+    // Kapag none ang gamit, ang verifyOrigin ang pangunahing CSRF protection.
+    COOKIE_SAMESITE: z.enum(["lax", "strict", "none"]).default("lax"),
   })
-  // Rules that depend on more than one value.
+
+  // Mga validation na nangangailangan ng higit sa isang environment setting.
   .superRefine((value, ctx) => {
+    // Sa production, dapat HTTPS ang frontend URL para secure ang communication.
     if (
       value.NODE_ENV === "production" &&
       !value.FRONTEND_URL.startsWith("https://")
@@ -81,34 +112,50 @@ const envSchema = z
         message: "must start with https:// in production",
       });
     }
+
+    // Hindi tatanggapin ng browser ang SameSite=None cookie kapag walang Secure.
+    // Secure lang ang cookies natin sa production, kaya production lang
+    // puwedeng gumamit ng COOKIE_SAMESITE=none.
+    if (value.COOKIE_SAMESITE === "none" && value.NODE_ENV !== "production") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["COOKIE_SAMESITE"],
+        message: "can only be 'none' in production (the cookie must be Secure)",
+      });
+    }
   });
 
 export const parseEnv = (raw: Record<string, string | undefined>) => {
-  // "PORT=" (empty) in a .env file means "not set", not "set to nothing".
-  // Without this, Number("") is 0, so PORT= would silently become port 0.
+  // Tinatanggal ang undefined at empty string values.
+  // Halimbawa, kapag PORT= lang ang nasa .env, ituturing natin itong
+  // walang value para hindi ito maging number na 0.
   const cleaned = Object.fromEntries(
     Object.entries(raw).filter(([, value]) => value !== undefined && value !== "")
   );
 
+  // Chine-check kung pasok sa schema ang lahat ng environment settings.
   const result = envSchema.safeParse(cleaned);
 
   if (!result.success) {
-    // We print only the NAME of each bad setting and what is wrong with it.
-    // NEVER the value: it may be a secret, and this message ends up in logs.
+    // Kinukuha ang pangalan ng setting at dahilan kung bakit invalid.
+    // Hindi natin isinasama ang actual value dahil maaaring secret ito
+    // at mapunta sa application logs.
     const problems = result.error.issues
       .map((issue) => `  - ${issue.path.join(".") || "(root)"}: ${issue.message}`)
       .join("\n");
 
+    // Ititigil ang parsing at magbibigay ng error kapag may invalid setting.
     throw new Error(
       `Invalid environment configuration:\n${problems}\n` +
         "Fix your .env file (see .env.example)."
     );
   }
 
+  // Lahat ng settings ay valid na, kaya puwede na nating gamitin ang result.
   const value = result.data;
 
-  // Freezes the env object so its values cannot be accidentally changed.
-
+  // Ibabalik ang environment settings gamit ang consistent naming convention.
+  // Object.freeze() para maiwasan ang accidental changes habang tumatakbo ang app.
   return Object.freeze({
     nodeEnv: value.NODE_ENV,
     isProduction: value.NODE_ENV === "production",
@@ -118,21 +165,27 @@ export const parseEnv = (raw: Record<string, string | undefined>) => {
     jwtSecret: value.JWT_SECRET,
     logLevel: value.LOG_LEVEL,
     trustProxy: value.TRUST_PROXY,
+    cookieSameSite: value.COOKIE_SAMESITE,
 
-    // An explicit value always wins. Otherwise: docs on, except in production.
+    // Kapag may explicit setting sa .env, iyon ang susundin.
+    // Kung wala, enabled ang docs sa development/test at disabled sa production.
     docsEnabled:
       value.API_DOCS_ENABLED !== undefined
         ? value.API_DOCS_ENABLED === "true"
         : value.NODE_ENV !== "production",
 
+    // Database configuration na naka-group sa db object.
+    // Ginagawang boolean ang DB_SSL para true/false na ang gamitin sa code.
     db: Object.freeze({
       host: value.DB_HOST,
       port: value.DB_PORT,
       name: value.DB_NAME,
       user: value.DB_USER,
       password: value.DB_PASSWORD,
+      ssl: value.DB_SSL === "true",
     }),
   });
 };
 
+// Kinukuha ang TypeScript type base sa actual return value ng parseEnv.
 export type Env = ReturnType<typeof parseEnv>;

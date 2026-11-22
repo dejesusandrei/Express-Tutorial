@@ -58,10 +58,13 @@ export const pool = new Pool({
   // ng database connection.
   application_name: "express-api",
 
-  // Kapag deployed na ang app, maaaring kailanganin ang SSL connection
-  // depende sa requirements ng database provider.
-  // Halimbawa:
-  // ssl: env.db.ssl ? { rejectUnauthorized: true } : false,
+  // Gumagamit ng encrypted connection kapag DB_SSL=true.
+  // Ang rejectUnauthorized ay nagche-check kung valid ang certificate
+  // ng database server para masigurong trusted ang connection.
+  // Kapag self-signed certificate ang gamit, kailangan ang CA certificate
+  // ng host o gamitin ang internal connection address.
+  // Iwasang i-disable ang certificate checking para manatiling secure ang connection.
+  ssl: env.db.ssl ? { rejectUnauthorized: true } : false,
 });
 
 // Hinahandle ang unexpected errors sa idle database connections.
