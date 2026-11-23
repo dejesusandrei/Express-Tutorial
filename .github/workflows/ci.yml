@@ -57,7 +57,7 @@ jobs:
       # Ini-install ang Node.js at sini-set up ang npm cache.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: Express TS/package-lock.json
 
