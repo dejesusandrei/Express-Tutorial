@@ -103,8 +103,4 @@ describe("logger and user input", () => {
   });
 });
 
-describe("CI deployment gate test", () => {
-  it("intentionally fails to test GitHub Actions", () => {
-    expect(true).toBe(false);
-  });
-});
+
