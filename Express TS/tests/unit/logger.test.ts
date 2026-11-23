@@ -102,3 +102,9 @@ describe("logger and user input", () => {
     expect(lines[0].trim().split("\n")).toHaveLength(1);
   });
 });
+
+describe("CI deployment gate test", () => {
+  it("intentionally fails to test GitHub Actions", () => {
+    expect(true).toBe(false);
+  });
+});
