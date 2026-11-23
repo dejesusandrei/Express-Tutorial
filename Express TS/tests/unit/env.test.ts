@@ -51,6 +51,7 @@ describe("parseEnv: valid settings", () => {
       name: "express_dev",
       user: "postgres",
       password: "db-password-VALUE-123",
+      ssl: false,
     });
   });
 
@@ -220,6 +221,46 @@ describe("parseEnv: API docs switch", () => {
   it("rejects an API_DOCS_ENABLED that is not true or false", () => {
     expect(errorOf(validEnv({ API_DOCS_ENABLED: "yes" }))).toContain(
       "API_DOCS_ENABLED"
+    );
+  });
+});
+
+describe("parseEnv: deployment settings", () => {
+  it("DB_SSL is off by default and can be turned on", () => {
+    expect(parseEnv(validEnv()).db.ssl).toBe(false);
+    expect(parseEnv(validEnv({ DB_SSL: "true" })).db.ssl).toBe(true);
+  });
+
+  it("rejects a DB_SSL that is not true or false", () => {
+    expect(errorOf(validEnv({ DB_SSL: "yes" }))).toContain("DB_SSL");
+  });
+
+  it("COOKIE_SAMESITE defaults to lax", () => {
+    expect(parseEnv(validEnv()).cookieSameSite).toBe("lax");
+  });
+
+  it("COOKIE_SAMESITE=none is rejected outside production (the cookie would not be Secure)", () => {
+    const message = errorOf(validEnv({ COOKIE_SAMESITE: "none" }));
+
+    expect(message).toContain("COOKIE_SAMESITE");
+    expect(message).toContain("production");
+  });
+
+  it("COOKIE_SAMESITE=none is accepted in production", () => {
+    const env = parseEnv(
+      validEnv({
+        NODE_ENV: "production",
+        FRONTEND_URL: "https://myapp.com",
+        COOKIE_SAMESITE: "none",
+      })
+    );
+
+    expect(env.cookieSameSite).toBe("none");
+  });
+
+  it("rejects an unknown COOKIE_SAMESITE", () => {
+    expect(errorOf(validEnv({ COOKIE_SAMESITE: "maybe" }))).toContain(
+      "COOKIE_SAMESITE"
     );
   });
 });
