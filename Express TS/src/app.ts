@@ -43,6 +43,8 @@ app.use((req, _res, next) => {
         ips: req.ips,
         socket: req.socket.remoteAddress,
         trustProxy: env.trustProxy,
+        cfConnectingIp: req.headers["cf-connecting-ip"],
+        xRealIp: req.headers["x-real-ip"],
       },
       "IP DEBUG"
     );
