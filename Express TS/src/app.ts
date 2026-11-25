@@ -33,25 +33,6 @@ app.disable("x-powered-by");
 // Para makuha ang totoong IP ng user sa logs at rate limiter.
 app.set("trust proxy", env.trustProxy);
 
-// TEMPORARY: delete after you find the right TRUST_PROXY value.
-app.use((req, _res, next) => {
-  if (req.path === "/api/health/ready") {
-    logger.info(
-      {
-        xff: req.headers["x-forwarded-for"],
-        ip: req.ip,
-        ips: req.ips,
-        socket: req.socket.remoteAddress,
-        trustProxy: env.trustProxy,
-        cfConnectingIp: req.headers["cf-connecting-ip"],
-        xRealIp: req.headers["x-real-ip"],
-      },
-      "IP DEBUG"
-    );
-  }
-  next();
-});
-
 // =========================
 // Global Middleware
 // =========================

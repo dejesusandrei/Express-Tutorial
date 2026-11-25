@@ -60,8 +60,13 @@ const requestLogger = (
       // 5xx = server error
       // 4xx = client error
       // 2xx/3xx = normal request
+      const isHealthCheck = req.path.startsWith("/api/health");
+
       const level =
-        res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
+        res.statusCode >= 500 ? "error"
+        : res.statusCode >= 400 ? "warn"
+        : isHealthCheck ? "debug"   // successful health checks: hidden at LOG_LEVEL=info
+        : "info";
 
       // Isinusulat ang request details sa logs.
       logger[level](
