@@ -10,7 +10,7 @@
     "start": "node dist/server.js",
     "test:run": "vitest run"
   },
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22" },
   "keywords": [],
   "author": "",
   "license": "ISC",
