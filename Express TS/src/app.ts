@@ -4,6 +4,8 @@ import helmet from "helmet";
 import { env } from "./config/env.config.js";
 import cookieParser from "cookie-parser";
 
+import { logger } from "./utils/logger.js";
+
 
 // Global Middleware
 import requestLogger from "./middleware/requestLogger.js";
@@ -30,6 +32,23 @@ app.disable("x-powered-by");
 // 0 kapag local, usually 1 kapag deployed.
 // Para makuha ang totoong IP ng user sa logs at rate limiter.
 app.set("trust proxy", env.trustProxy);
+
+// TEMPORARY: delete after you find the right TRUST_PROXY value.
+app.use((req, _res, next) => {
+  if (req.path === "/api/health/ready") {
+    logger.info(
+      {
+        xff: req.headers["x-forwarded-for"],
+        ip: req.ip,
+        ips: req.ips,
+        socket: req.socket.remoteAddress,
+        trustProxy: env.trustProxy,
+      },
+      "IP DEBUG"
+    );
+  }
+  next();
+});
 
 // =========================
 // Global Middleware
